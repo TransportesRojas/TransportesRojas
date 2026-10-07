@@ -1,0 +1,479 @@
+.lev {
+
+  --navy: #0B2D4A;
+  --navy-900: #071E33;
+  --red: #D64545;
+  --red-dark: #B13333;
+  --red-light: #E87A7A;
+  --gray: #A7B3C3;
+  --paper: #F7F9FB;
+  --ink: #1F2937;
+  --ink-soft: #64748B;
+  --green: #16A34A;
+  --line: #E4E8EE;
+  --red-glow: rgba(214, 69, 69, 0.24);
+
+  font-family: "Poppins", "Inter", system-ui, sans-serif;
+  color: var(--ink);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(214, 69, 69, 0.16), transparent 45%),
+    radial-gradient(circle at 90% 95%, rgba(37, 99, 235, 0.08), transparent 55%),
+    var(--navy);
+  position: relative;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+
+.lev__bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.lev__bg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+
+.lev__strip {
+  position: relative;
+  z-index: 2;
+  background: var(--navy-900);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  font-family: "Montserrat", sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 3.2px;
+  text-align: center;
+  padding: 12px 16px;
+}
+
+.lev__strip span {
+  display: inline-block;
+  padding: 0 16px;
+  position: relative;
+}
+
+.lev__strip span::before,
+.lev__strip span::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 40px;
+  height: 1px;
+  background: var(--red);
+  opacity: 0.7;
+}
+
+.lev__strip span::before {
+  left: -44px;
+}
+
+.lev__strip span::after {
+  right: -44px;
+}
+
+
+.lev__content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px 32px;
+}
+
+.lev__card {
+  width: 100%;
+  max-width: 540px;
+  background: #FFF;
+  border-radius: 24px;
+  padding: 36px 48px 40px;
+  text-align: center;
+  box-shadow:
+    0 30px 80px -30px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  position: relative;
+  animation: lev-pop 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.lev__card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--navy), var(--red));
+  border-radius: 0 0 4px 4px;
+}
+
+@keyframes lev-pop {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
+.lev__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Montserrat", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+  color: var(--navy);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 14px;
+  margin-bottom: 22px;
+}
+
+.lev__badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 4px rgba(214, 69, 69, 0.18);
+}
+
+
+.lev__logo {
+  display: block;
+  width: 350px;
+  height: auto;
+  margin: 0 auto 24px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+
+.lev__card h1 {
+  font-family: "Montserrat", sans-serif;
+  font-weight: 800;
+  font-size: 28px;
+  letter-spacing: -0.4px;
+  color: var(--navy);
+  margin: 0 0 8px;
+}
+
+.lev__sub {
+  font-family: "Poppins", sans-serif;
+  font-size: 14.5px;
+  color: var(--ink-soft);
+  margin: 0 auto 28px;
+  line-height: 1.6;
+  max-width: 34ch;
+}
+
+
+.lev__field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.lev__field label {
+  font-family: "Montserrat", sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--navy);
+}
+
+.lev__input-wrap {
+  position: relative;
+}
+
+.lev__field input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1.5px solid var(--line);
+  background: var(--paper);
+  border-radius: 12px;
+  padding: 15px 16px;
+  font-size: 16px;
+  font-family: "Poppins", sans-serif;
+  color: var(--ink);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.lev__field input::placeholder {
+  color: #A9B3C0;
+}
+
+.lev__field input:focus {
+  outline: none;
+  background: #FFF;
+  border-color: var(--red);
+  box-shadow: 0 0 0 4px var(--red-glow);
+}
+
+.lev__field input[data-has-toggle="true"] {
+  padding-right: 100px;
+}
+
+.lev__toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: "Montserrat", sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.lev__toggle:hover {
+  color: var(--red-dark);
+  background: rgba(214, 69, 69, 0.07);
+}
+
+
+.lev__error {
+  background: rgba(214, 69, 69, 0.08);
+  border: 1px solid rgba(214, 69, 69, 0.22);
+  color: var(--red-dark);
+  font-size: 13px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  text-align: left;
+  line-height: 1.5;
+  animation: lev-shake 0.35s ease;
+}
+
+@keyframes lev-shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-4px);
+  }
+
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+
+.lev__submit {
+  width: 100%;
+  border: none;
+  background: linear-gradient(135deg, var(--navy) 0%, #143F66 100%);
+  color: #FFF;
+  font-family: "Montserrat", sans-serif;
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 17px 24px;
+  border-radius: 12px;
+  cursor: pointer;
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 14px 28px -14px rgba(11, 45, 74, 0.65);
+  transition: transform 0.1s, box-shadow 0.2s, filter 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.lev__submit::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--red);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.lev__submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 18px 34px -14px rgba(11, 45, 74, 0.75);
+}
+
+.lev__submit:hover:not(:disabled)::after {
+  transform: scaleX(1);
+}
+
+.lev__submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.lev__submit:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.lev__spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #FFF;
+  border-radius: 50%;
+  animation: lev-spin 0.7s linear infinite;
+}
+
+@keyframes lev-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+.lev__help {
+  margin: 24px 0 0;
+  padding-top: 20px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.lev__help a {
+  color: var(--red-dark);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.lev__help a:hover {
+  text-decoration: underline;
+}
+
+
+.lev__seals {
+  list-style: none;
+  padding: 18px 0 0;
+  margin: 20px 0 0;
+  border-top: 1px dashed var(--line);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.lev__seals li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--gray);
+  font-family: "Montserrat", sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  transition: color 0.2s ease;
+}
+
+.lev__seals li:hover {
+  color: var(--navy);
+}
+
+.lev__seals svg {
+  width: 22px;
+  height: 22px;
+  color: var(--navy);
+  opacity: 0.85;
+}
+
+
+.lev__legal {
+  margin-top: 26px;
+  font-family: "Poppins", sans-serif;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+
+@media (max-width: 560px) {
+  .lev__strip span {
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  .lev__strip span::before,
+  .lev__strip span::after {
+    display: none;
+  }
+
+  .lev__card {
+    padding: 30px 26px 32px;
+    border-radius: 20px;
+  }
+
+  .lev__logo {
+    width: 150px;
+    margin-bottom: 20px;
+  }
+
+  .lev__card h1 {
+    font-size: 24px;
+  }
+
+  .lev__seals {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .lev__seals li {
+    font-size: 10px;
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+
+  .lev__card,
+  .lev__error,
+  .lev__spinner {
+    animation: none !important;
+  }
+
+  .lev__submit::after {
+    transition: none !important;
+  }
+}

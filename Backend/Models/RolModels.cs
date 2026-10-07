@@ -1,0 +1,1 @@
+namespace Backend.Models;public record CrearRolModel(string Nombre, string? Descripcion);public record ActualizarRolModel(string Nombre, string? Descripcion);public record RolResponse(long Id, string Nombre, string? Descripcion);

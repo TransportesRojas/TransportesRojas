@@ -1,0 +1,860 @@
+.cc-page {
+  --cc-bg: #0b2d4a;
+  --cc-surface: #112d46;
+  --cc-surface2: #0e2238;
+  --cc-border: rgba(255, 255, 255, 0.08);
+  --cc-red: #d64545;
+  --cc-red-hover: #e05555;
+  --cc-green: #217346;
+  --cc-green-hover: #1a5c38;
+  --cc-blue-light: #4b9fd5;
+  --cc-text: #c8dce9;
+  --cc-text-muted: #6b93ab;
+  --cc-text-strong: #e8f4ff;
+  --cc-radius: 10px;
+  --cc-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+  min-height: 100vh;
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  padding: 32px 28px;
+  box-sizing: border-box;
+}
+
+/*  Encabezado  */
+.cc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cc-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cc-title {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: var(--cc-text-strong);
+  letter-spacing: -0.3px;
+}
+
+.cc-badge {
+  background: rgba(75, 159, 213, 0.15);
+  color: var(--cc-blue-light);
+  border: 1px solid rgba(75, 159, 213, 0.3);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Boton + Nuevo */
+.cc-btn-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--cc-red);
+  color: #fff;
+  border: none;
+  border-radius: var(--cc-radius);
+  padding: 9px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .18s, box-shadow .18s, transform .12s;
+  box-shadow: 0 4px 14px rgba(214, 69, 69, 0.4);
+}
+
+.cc-btn-add:hover {
+  background: var(--cc-red-hover);
+  box-shadow: 0 6px 20px rgba(214, 69, 69, 0.55);
+  transform: translateY(-1px);
+}
+
+.cc-btn-add:active {
+  transform: translateY(0);
+}
+
+/*  Tabla */
+.cc-table-wrapper {
+  border-radius: var(--cc-radius);
+  border: 1px solid var(--cc-border);
+  overflow: hidden;
+  overflow-x: auto;
+  box-shadow: var(--cc-shadow);
+}
+
+.cc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.845rem;
+  white-space: nowrap;
+}
+
+/* Encabezados ordenables */
+.cc-table thead tr:first-child {
+  background: var(--cc-surface2);
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-th-sortable {
+  padding: 11px 14px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cc-text-muted);
+  user-select: none;
+  transition: background .12s, color .12s;
+}
+
+.cc-th-sortable:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--cc-text-strong);
+}
+
+.cc-th-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Iconos de orden */
+.cc-si--off {
+  opacity: 0.35;
+}
+
+.cc-si--on {
+  color: var(--cc-blue-light);
+}
+
+.cc-th-actions {
+  padding: 11px 12px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cc-text-muted);
+  width: 80px;
+}
+
+/* Fila de filtros */
+.cc-filter-row {
+  background: #0c2540;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-filter-row td {
+  padding: 6px 6px;
+}
+
+.cc-filter-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--cc-surface2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  padding: 5px 8px;
+  color: var(--cc-text-strong);
+  font-size: 0.78rem;
+  outline: none;
+  transition: border-color .14s, box-shadow .14s;
+}
+
+.cc-filter-input::placeholder {
+  color: var(--cc-text-muted);
+  font-size: 0.74rem;
+}
+
+.cc-filter-input:focus {
+  border-color: rgba(75, 159, 213, 0.45);
+  box-shadow: 0 0 0 2px rgba(75, 159, 213, 0.1);
+}
+
+.cc-filter-select {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--cc-surface2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  padding: 5px 8px;
+  color: var(--cc-text-strong);
+  font-size: 0.78rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .14s;
+}
+
+.cc-filter-select option {
+  background: #112d46;
+}
+
+.cc-filter-select:focus {
+  border-color: rgba(75, 159, 213, 0.45);
+}
+
+/* Filas de datos */
+.cc-table tbody tr {
+  border-bottom: 1px solid var(--cc-border);
+  transition: background .12s;
+}
+
+.cc-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.cc-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.cc-table td {
+  padding: 10px 14px;
+  color: var(--cc-text);
+}
+
+
+.cc-badge-status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.73rem;
+  font-weight: 700;
+}
+
+.cc-badge-status--on {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.cc-badge-status--off {
+  background: rgba(214, 69, 69, 0.1);
+  color: #f97575;
+  border: 1px solid rgba(214, 69, 69, 0.2);
+}
+
+/* Celda de acciones  */
+.cc-td-actions {
+  padding: 4px 8px !important;
+  text-align: center;
+  position: relative;
+}
+
+.cc-menu-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.cc-btn-options {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--cc-text-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+.cc-btn-options:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--cc-border);
+  color: var(--cc-text-strong);
+}
+
+
+.cc-dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  top: auto;
+  right: 0;
+  z-index: 200;
+  background: #152e44;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  min-width: 130px;
+  overflow: hidden;
+  animation: cc-drop-in .15s ease;
+}
+
+@keyframes cc-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cc-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 500;
+  transition: background .12s;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.cc-dropdown-item--edit {
+  color: var(--cc-blue-light);
+}
+
+.cc-dropdown-item--edit:hover {
+  background: rgba(75, 159, 213, 0.12);
+}
+
+.cc-dropdown-item--delete {
+  color: #f97575;
+}
+
+.cc-dropdown-item--delete:hover {
+  background: rgba(214, 69, 69, 0.12);
+}
+
+/* Barra inferior  */
+.cc-footer-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+/* Boton Excel */
+.cc-btn-excel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--cc-green);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, box-shadow .15s, transform .1s;
+  box-shadow: 0 3px 10px rgba(33, 115, 70, 0.4);
+  white-space: nowrap;
+}
+
+.cc-btn-excel:hover {
+  background: var(--cc-green-hover);
+  box-shadow: 0 5px 16px rgba(33, 115, 70, 0.55);
+  transform: translateY(-1px);
+}
+
+.cc-btn-excel:active {
+  transform: translateY(0);
+}
+
+/* Selector de registros por pagina */
+.cc-pagesize-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cc-pagesize-label {
+  font-size: 0.8rem;
+  color: var(--cc-text-muted);
+  white-space: nowrap;
+}
+
+.cc-pagesize-select {
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  color: var(--cc-text-strong);
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.cc-pagesize-select:focus {
+  border-color: rgba(75, 159, 213, 0.5);
+}
+
+.cc-pagesize-select option {
+  background: #112d46;
+}
+
+/* Paginacion */
+.cc-pagination {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.cc-btn-page {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  color: var(--cc-text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+.cc-btn-page:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--cc-text-strong);
+}
+
+.cc-btn-page:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.cc-btn-page--active {
+  background: var(--cc-red) !important;
+  border-color: var(--cc-red) !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+
+.cc-pagination-info {
+  margin-left: 8px;
+  font-size: 0.78rem;
+  color: var(--cc-text-muted);
+  white-space: nowrap;
+}
+
+.cc-td-empty {
+  text-align: center;
+  padding: 40px !important;
+  color: var(--cc-text-muted);
+  font-size: 0.9rem;
+}
+
+/*
+   MODALES
+ */
+.cc-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 18, 30, 0.82);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  animation: cc-fade-in .18s ease;
+}
+
+@keyframes cc-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.cc-modal {
+  background: #112d46;
+  border: 1px solid var(--cc-border);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px 32px;
+  box-sizing: border-box;
+  animation: cc-slide-up .22s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes cc-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cc-modal--confirm {
+  max-width: 440px;
+  text-align: center;
+}
+
+.cc-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.cc-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--cc-text-strong);
+}
+
+.cc-btn-close {
+  background: transparent;
+  border: none;
+  color: var(--cc-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background .13s, color .13s;
+}
+
+.cc-btn-close:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--cc-text-strong);
+}
+
+/* Grid formulario */
+.cc-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 18px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 480px) {
+  .cc-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cc-field--wide {
+  grid-column: 1 / -1;
+}
+
+.cc-field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cc-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cc-field input {
+  background: var(--cc-surface2);
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  padding: 9px 12px;
+  color: var(--cc-text-strong);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.cc-field input::placeholder {
+  color: var(--cc-text-muted);
+}
+
+.cc-field input:focus {
+  border-color: rgba(75, 159, 213, 0.5);
+  box-shadow: 0 0 0 3px rgba(75, 159, 213, 0.12);
+}
+
+/* Acciones modal */
+.cc-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cc-modal-actions--center {
+  justify-content: center;
+}
+
+.cc-btn-cancel {
+  background: transparent;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  color: var(--cc-text-muted);
+  padding: 9px 18px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background .14s, border-color .14s, color .14s;
+}
+
+.cc-btn-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--cc-text-strong);
+}
+
+.cc-btn-save {
+  background: var(--cc-red);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  padding: 9px 22px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background .14s, box-shadow .14s;
+  box-shadow: 0 4px 14px rgba(214, 69, 69, 0.35);
+}
+
+.cc-btn-save:hover:not(:disabled) {
+  background: var(--cc-red-hover);
+  box-shadow: 0 6px 18px rgba(214, 69, 69, 0.5);
+}
+
+.cc-btn-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cc-btn-delete {
+  background: var(--cc-red);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  padding: 9px 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background .14s;
+}
+
+.cc-btn-delete:hover:not(:disabled) {
+  background: var(--cc-red-hover);
+}
+
+.cc-btn-delete:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Modal confirmar */
+.cc-confirm-icon {
+  margin-bottom: 14px;
+  color: #f59e0b;
+}
+
+.cc-confirm-title {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--cc-text-strong);
+}
+
+.cc-confirm-desc {
+  color: var(--cc-text);
+  font-size: 0.95rem;
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.cc-confirm-id {
+  color: var(--cc-red);
+  font-size: 1.05rem;
+}
+
+.cc-confirm-name {
+  color: var(--cc-text-strong);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+  display: block;
+}
+
+.cc-confirm-note {
+  color: var(--cc-text-muted);
+  font-size: 0.8rem;
+  margin: 0 0 16px;
+  display: block;
+}
+
+/* Input de segunda confirmacion (escribir "confirmar") */
+.cc-confirm-input-wrap {
+  margin-bottom: 22px;
+  text-align: left;
+}
+
+.cc-confirm-input-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--cc-text-muted);
+  margin-bottom: 7px;
+}
+
+.cc-confirm-input-label strong {
+  color: var(--cc-text);
+}
+
+.cc-confirm-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--cc-surface2);
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  padding: 9px 12px;
+  color: var(--cc-text-strong);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+.cc-confirm-input::placeholder {
+  color: var(--cc-text-muted);
+  opacity: 0.5;
+}
+
+.cc-confirm-input:focus {
+  border-color: rgba(214, 69, 69, 0.5);
+  box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.1);
+}
+
+/* Toggle switch (Activo en edicion)  */
+.cc-field--toggle {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--cc-surface2);
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.cc-toggle-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cc-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Ocultar checkbox nativo */
+.cc-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Track */
+.cc-toggle-track {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--cc-border);
+  border-radius: 999px;
+  transition: background .2s, border-color .2s;
+  flex-shrink: 0;
+}
+
+.cc-toggle input:checked~.cc-toggle-track {
+  background: rgba(52, 211, 153, 0.25);
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+/* Thumb */
+.cc-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: var(--cc-text-muted);
+  border-radius: 50%;
+  transition: transform .2s, background .2s;
+}
+
+.cc-toggle input:checked~.cc-toggle-track .cc-toggle-thumb {
+  transform: translateX(18px);
+  background: #34d399;
+}
+
+/* Texto de estado */
+.cc-toggle-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: color .2s;
+}
+
+.cc-toggle-text--on {
+  color: #34d399;
+}
+
+.cc-toggle-text--off {
+  color: #f97575;
+}
+
+/* Spinner */
+@keyframes cc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cc-spin {
+  animation: cc-spin .7s linear infinite;
+}
