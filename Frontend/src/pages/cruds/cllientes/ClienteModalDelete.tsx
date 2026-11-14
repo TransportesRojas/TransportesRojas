@@ -35,7 +35,7 @@ export function ClienteModalDelete({
           Eliminar cliente
         </h2>
         <p className="cc-confirm-desc">
-          Estas seguro de que quieres eliminar al cliente con el ID&nbsp;
+          ¿Estás seguro de que deseas eliminar al cliente con el ID&nbsp;
           <strong className="cc-confirm-id">{confirmando.id}</strong>?
         </p>
         <p className="cc-confirm-name">
@@ -43,7 +43,7 @@ export function ClienteModalDelete({
           {confirmando.apellidoMaterno}
         </p>
         <p className="cc-confirm-note">
-          Esta accion marcara al cliente como inactivo y puede revertirse.
+          Esta acción marcará al cliente como inactivo y puede revertirse.
         </p>
 
         <div className="cc-confirm-input-wrap">
@@ -87,7 +87,7 @@ export function ClienteModalDelete({
                 <Loader2 size={15} className="cc-spin" /> Eliminando...
               </>
             ) : (
-              "Si, eliminar"
+              "Sí, eliminar"
             )}
           </button>
         </div>

@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import "../estilos/cruds.css";
 import { fetchApi } from "../../../services/api";
+import { useToast } from "../../../components/Toast";
+import { extraerMensajeErrorApi } from "../../../utils/errorMessages";
+import { hasPermissionOrRole } from "../../../utils/auth";
+import { limpiarEnteroPositivo } from "../../../utils/inputValidation";
 import {
   type TipoMant,
   type FormData,
@@ -30,20 +34,20 @@ import {
 
 function exportarExcel(datos: TipoMant[]) {
   const cols = [
-    "ID",
+    "#",
     "Nombre",
-    "Descripcion",
+    "Descripción",
     "KM Intervalo",
     "Aplica a",
-    "Activo",
+    "Estado",
   ];
   const rows = datos.map((t) => [
-    t.id,
+    `#${t.id}`,
     t.nombre,
     t.descripcion ?? "",
     t.kmIntervalo ?? "",
     t.aplicaATipoVehiculo ?? "",
-    t.activo ? "Si" : "No",
+    t.activo ? "Activo" : "Inactivo",
   ]);
   const csv = [cols, ...rows]
     .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
@@ -58,6 +62,7 @@ function exportarExcel(datos: TipoMant[]) {
 }
 
 export default function CrudTipoMantenimiento() {
+  const { toast } = useToast();
   const [items, setItems] = useState<TipoMant[]>([]);
   const [, setLoading] = useState(false);
 
@@ -67,11 +72,12 @@ export default function CrudTipoMantenimiento() {
       const data = await fetchApi("/TipoMantenimiento");
       setItems(data);
     } catch (error) {
-      console.error("Error", error);
+      console.error("Error al cargar tipos de mantenimiento", error);
+      toast.error("Error al cargar los tipos de mantenimiento");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     cargarDatos();
@@ -80,6 +86,7 @@ export default function CrudTipoMantenimiento() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [filters, setFilters] = useState<Filters>(FILTERS_VACIO);
+  const [busquedaGlobal, setBusquedaGlobal] = useState("");
   const [sortCol, setSortCol] = useState<SortCol>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -93,29 +100,45 @@ export default function CrudTipoMantenimiento() {
   const filtered = items.filter((t) => {
     if (filters.activo === "si" && !t.activo) return false;
     if (filters.activo === "no" && t.activo) return false;
+
+    if (busquedaGlobal.trim()) {
+      const q = busquedaGlobal.toLowerCase();
+      const match = [
+        t.id,
+        t.nombre,
+        t.descripcion,
+        t.kmIntervalo,
+        t.aplicaATipoVehiculo,
+      ].some((val) => String(val ?? "").toLowerCase().includes(q));
+      if (!match) return false;
+    }
+
     const m = (v: string | number | boolean | null, f: string) =>
       !f ||
       String(v ?? "")
         .toLowerCase()
         .includes(f.toLowerCase());
-    return [
-      "id",
-      "nombre",
-      "descripcion",
-      "kmIntervalo",
-      "aplicaATipoVehiculo",
-    ].every((col) =>
-      m(t[col as keyof TipoMant], filters[col as keyof Filters]),
+
+    return (
+      m(t.id, filters.id) &&
+      m(t.nombre, filters.nombre) &&
+      m(t.descripcion, filters.descripcion) &&
+      m(t.kmIntervalo, filters.kmIntervalo)
     );
   });
 
   const sorted = [...filtered].sort((a, b) => {
-    if (!sortCol) return 0;
-    const av = a[sortCol],
-      bv = b[sortCol];
-    if (av == null) return 1;
-    if (bv == null) return -1;
-    return (sortDir === "asc" ? 1 : -1) * (av < bv ? -1 : av > bv ? 1 : 0);
+    if (sortCol) {
+      const av = a[sortCol],
+        bv = b[sortCol];
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (sortDir === "asc" ? 1 : -1) * (av < bv ? -1 : av > bv ? 1 : 0);
+    }
+    if (a.activo !== b.activo) {
+      return a.activo ? -1 : 1;
+    }
+    return a.id - b.id;
   });
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
@@ -126,6 +149,7 @@ export default function CrudTipoMantenimiento() {
       if (e.key === "Escape") {
         setModalAbierto(false);
         setConfirmando(null);
+        setConfirmInput("");
       }
     };
     document.addEventListener("keydown", h);
@@ -171,6 +195,7 @@ export default function CrudTipoMantenimiento() {
   }, []);
 
   const guardar = useCallback(async () => {
+    if (guardando) return;
     setGuardando(true);
     try {
       if (editando) {
@@ -179,20 +204,23 @@ export default function CrudTipoMantenimiento() {
           body: JSON.stringify(form)
         });
         setItems((prev) => prev.map((t) => (t.id === editando.id ? actualizado : t)));
+        toast.success(`Tipo de mantenimiento "${form.nombre}" actualizado.`);
       } else {
         const nuevo = await fetchApi('/TipoMantenimiento', {
           method: 'POST',
           body: JSON.stringify(form)
         });
         setItems((prev) => [...prev, nuevo]);
+        toast.success(`Tipo de mantenimiento "${form.nombre}" creado exitosamente.`);
       }
       setModalAbierto(false);
-    } catch (error) {
-      console.error("Error al guardar", error);
+    } catch (error: any) {
+      console.error("Error al guardar tipo de mantenimiento", error);
+      toast.error(extraerMensajeErrorApi(error, "Error al procesar el tipo de mantenimiento."));
     } finally {
       setGuardando(false);
     }
-  }, [editando, form]);
+  }, [editando, form, guardando, toast]);
 
   const abrirConfirmar = useCallback((t: TipoMant) => {
     setConfirmInput("");
@@ -200,20 +228,22 @@ export default function CrudTipoMantenimiento() {
   }, []);
 
   const eliminar = useCallback(async () => {
-    if (!confirmando) return;
+    if (!confirmando || eliminando) return;
     setEliminando(true);
     try {
       await fetchApi(`/TipoMantenimiento/${confirmando.id}`, { method: 'DELETE' });
       setItems((prev) =>
         prev.map((t) => (t.id === confirmando.id ? { ...t, activo: false } : t)),
       );
+      toast.info(`Tipo de mantenimiento "${confirmando.nombre}" dado de baja.`);
       setConfirmando(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al eliminar", error);
+      toast.error(extraerMensajeErrorApi(error, "Error al dar de baja el tipo de mantenimiento."));
     } finally {
       setEliminando(false);
     }
-  }, [confirmando]);
+  }, [confirmando, eliminando, toast]);
 
   const onChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -226,66 +256,87 @@ export default function CrudTipoMantenimiento() {
         type === "checkbox"
           ? checked
           : name === "kmIntervalo"
-            ? value === ""
-              ? null
-              : Number(value)
+            ? (() => {
+                const limpio = limpiarEnteroPositivo(value, 7);
+                return limpio === "" ? null : Number(limpio);
+              })()
             : value,
     }));
   };
 
   const columns: ColumnDef<TipoMant>[] = [
-    { key: "id", label: "ID" },
     { key: "nombre", label: "Nombre" },
-    { key: "descripcion", label: "Descripcion", render: (t) => t.descripcion ?? "-" },
+    {
+      key: "descripcion",
+      label: "Descripción",
+      render: (t) => t.descripcion || <span className="text-slate-400 italic">-</span>,
+    },
     {
       key: "kmIntervalo",
-      label: "KM Intervalo",
-      render: (t) => (t.kmIntervalo != null ? `${t.kmIntervalo.toLocaleString()} km` : "-"),
+      label: "Intervalo KM",
+      render: (t) => (
+        <span className="font-mono text-xs text-slate-800">
+          {t.kmIntervalo ? `${t.kmIntervalo.toLocaleString()} km` : "-"}
+        </span>
+      ),
     },
-    { key: "aplicaATipoVehiculo", label: "Aplica a", render: (t) => t.aplicaATipoVehiculo ?? "-" },
+    {
+      key: "aplicaATipoVehiculo",
+      label: "Aplica A",
+      render: (t) => t.aplicaATipoVehiculo || <span className="text-slate-400 italic">Todos</span>,
+    },
     {
       key: "activo",
-      label: "Activo",
+      label: "Estado",
       render: (t) => (
         <span
           className={`cc-badge-status ${t.activo ? "cc-badge-status--on" : "cc-badge-status--off"}`}
         >
-          {t.activo ? "Si" : "No"}
+          {t.activo ? "Activo" : "Inactivo"}
         </span>
       ),
     },
   ];
 
   const filterDefs: FilterDef[] = [
-    { key: "id", type: "text", placeholder: "Filtrar" },
-    { key: "nombre", type: "text", placeholder: "Filtrar" },
-    { key: "descripcion", type: "text", placeholder: "Filtrar" },
-    { key: "kmIntervalo", type: "text", placeholder: "Filtrar" },
-    { key: "aplicaATipoVehiculo", type: "text", placeholder: "Filtrar" },
     {
       key: "activo",
+      label: "Estado",
       type: "select",
       options: [
+        { value: "si", label: "Activos" },
         { value: "", label: "Todos" },
-        { value: "si", label: "Si" },
-        { value: "no", label: "No" },
+        { value: "no", label: "Inactivos" },
       ],
     },
   ];
 
+  const rolesAdminMant = ["RH", "Jefe"];
+  const puedeCrear = hasPermissionOrRole("tipo_mantenimiento.administrar", rolesAdminMant);
+  const puedeEditar = hasPermissionOrRole("tipo_mantenimiento.administrar", rolesAdminMant);
+  const puedeEliminar = hasPermissionOrRole("tipo_mantenimiento.administrar", rolesAdminMant);
+
   const actions: ActionDef<TipoMant>[] = [
-    {
-      label: "Editar",
-      icon: <Pencil size={14} />,
-      className: "cc-dropdown-item--edit",
-      onClick: abrirEditar,
-    },
-    {
-      label: "Eliminar",
-      icon: <Trash2 size={14} />,
-      className: "cc-dropdown-item--delete",
-      onClick: abrirConfirmar,
-    },
+    ...(puedeEditar
+      ? [
+          {
+            label: "Editar",
+            icon: <Pencil size={14} />,
+            className: "cc-dropdown-item--edit",
+            onClick: abrirEditar,
+          },
+        ]
+      : []),
+    ...(puedeEliminar
+      ? [
+          {
+            label: "Eliminar",
+            icon: <Trash2 size={14} />,
+            className: "cc-dropdown-item--delete",
+            onClick: abrirConfirmar,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -293,18 +344,17 @@ export default function CrudTipoMantenimiento() {
       <div className="cc-header">
         <div className="cc-title-group">
           <h1 className="cc-title">Tipos de Mantenimiento</h1>
-          <span className="cc-badge">
-            {filtered.length} de {items.length}
-          </span>
         </div>
-        <button
-          id="btn-agregar-tipomant"
-          className="cc-btn-add"
-          onClick={abrirAgregar}
-        >
-          <Plus size={17} strokeWidth={2.5} />
-          <span>Nuevo tipo</span>
-        </button>
+        {puedeCrear && (
+          <button
+            id="btn-agregar-tipomant"
+            className="cc-btn-add"
+            onClick={abrirAgregar}
+          >
+            <Plus size={17} strokeWidth={2.5} />
+            <span>Nuevo tipo</span>
+          </button>
+        )}
       </div>
 
       <TablaGenerica<TipoMant>
@@ -318,6 +368,17 @@ export default function CrudTipoMantenimiento() {
         onFilterChange={onFilterChange}
         actions={actions}
         idAccessor={(t) => t.id}
+        busquedaGlobal={busquedaGlobal}
+        onBusquedaGlobalChange={(val) => {
+          setBusquedaGlobal(val);
+          setPage(0);
+        }}
+        onLimpiarFiltros={() => {
+          setFilters(FILTERS_VACIO);
+          setBusquedaGlobal("");
+          setPage(0);
+        }}
+        placeholderGlobal="Buscar tipos de mantenimiento por nombre o descripción..."
       />
 
       <div className="cc-footer-bar">
@@ -348,7 +409,7 @@ export default function CrudTipoMantenimiento() {
               </option>
             ))}
           </select>
-          <span className="cc-pagesize-label">por pagina</span>
+          <span className="cc-pagesize-label">por página</span>
         </div>
         <div className="cc-pagination">
           <button

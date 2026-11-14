@@ -35,7 +35,7 @@ export function EmpleadoModalDelete({
           Eliminar empleado
         </h2>
         <p className="cc-confirm-desc">
-          Estas seguro de que quieres eliminar al empleado con el ID{" "}
+          ¿Estás seguro de que deseas eliminar al empleado con el ID{" "}
           <strong className="cc-confirm-id">{confirmando.id}</strong>?
         </p>
         <p className="cc-confirm-name">
@@ -85,7 +85,7 @@ export function EmpleadoModalDelete({
               </>
             ) : (
               <>
-                <Trash2 size={15} /> Si, eliminar
+                <Trash2 size={15} /> Sí, eliminar
               </>
             )}
           </button>

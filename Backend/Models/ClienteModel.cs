@@ -6,7 +6,8 @@ public record CrearClienteModel(
     string? ApellidoMaterno,
     string? Telefono,
     string? Email,
-    long? UsuarioId
+    long? UsuarioId,
+    string? Password = null
 );
 
 public record ActualizarClienteModel(
@@ -14,7 +15,8 @@ public record ActualizarClienteModel(
     string? ApellidoPaterno,
     string? ApellidoMaterno,
     string? Telefono,
-    string? Email
+    string? Email,
+    string? MotivoEdicion = null
 );
 
 public record ClienteResponse(
@@ -25,5 +27,7 @@ public record ClienteResponse(
     string? ApellidoMaterno,
     string? Telefono,
     string? Email,
-    bool Activo
+    bool Activo,
+    string? PasswordGenerada = null,
+    string? MotivoEdicion = null
 );

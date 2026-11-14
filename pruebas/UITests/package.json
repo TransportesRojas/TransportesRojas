@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "playwright test",
+    "test:v3": "playwright test tests/flujo-normal-envio.spec.ts tests/casos-de-uso-cruds.spec.ts tests/chofer-movil-y-rastreo.spec.ts tests/errores-y-toast-antispam.spec.ts tests/componentes-validaciones-y-estado.spec.ts"
   },
   "keywords": [],
   "author": "",

@@ -20,7 +20,7 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "RH, Personal administrativo")]
+    [Authorize(Roles = "RH, Personal administrativo, Jefe")]
     public async Task<IActionResult> ObtenerTodos([FromQuery] int skip = 0, [FromQuery] int take = 100)
     {
         var usuarios = await _usuarioService.GetUsuariosAsync(skip, take);
@@ -28,7 +28,7 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "RH, Personal administrativo, Chofer")]
+    [Authorize(Roles = "RH, Personal administrativo, Chofer, Jefe")]
     public async Task<IActionResult> ObtenerPorId(long id)
     {
         if (User.IsInRole("Chofer") && !User.IsInRole("RH") && !User.IsInRole("Personal administrativo"))
@@ -46,7 +46,7 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "RH, Personal administrativo")]
+    [Authorize(Roles = "RH, Personal administrativo, Jefe")]
     public async Task<IActionResult> Crear([FromBody] CrearUsuarioModel model)
     {
         if (User.IsInRole("Personal administrativo") && !User.IsInRole("RH"))
@@ -73,7 +73,7 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "RH, Personal administrativo, Chofer")]
+    [Authorize(Roles = "RH, Personal administrativo, Chofer, Jefe")]
     public async Task<IActionResult> Actualizar(long id, [FromBody] ActualizarUsuarioModel model)
     {
         if (User.IsInRole("Chofer") && !User.IsInRole("RH") && !User.IsInRole("Personal administrativo"))
@@ -106,7 +106,7 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "RH, Personal administrativo")]
+    [Authorize(Roles = "RH, Personal administrativo, Jefe")]
     public async Task<IActionResult> Eliminar(long id)
     {
         try
@@ -119,6 +119,55 @@ public class UsuarioController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return Conflict(new { mensaje = ex.Message });
+        }
+        catch (RetryableException)
+        {
+            return Conflict(new { mensaje = "No se pudo completar la operación tras múltiples intentos." });
+        }
+    }
+
+    [HttpPost("cambiar-password")]
+    public async Task<IActionResult> CambiarPassword([FromBody] CambiarPasswordModel model)
+    {
+        if (model is null || string.IsNullOrWhiteSpace(model.PasswordActual) || string.IsNullOrWhiteSpace(model.PasswordNueva))
+            return BadRequest(new { mensaje = "Debe proporcionar la contraseña actual y la nueva contraseña." });
+
+        if (string.IsNullOrWhiteSpace(model.PasswordNueva) || model.PasswordNueva.Length < 12)
+            return BadRequest(new { mensaje = "La nueva contraseña debe tener al menos 12 caracteres." });
+
+        var mayusculas = model.PasswordNueva.Count(char.IsUpper);
+        if (mayusculas < 2)
+            return BadRequest(new { mensaje = "La nueva contraseña debe contener al menos 2 letras mayúsculas." });
+
+        if (System.Text.RegularExpressions.Regex.IsMatch(model.PasswordNueva, @"[A-Z]{2}"))
+            return BadRequest(new { mensaje = "Las letras mayúsculas no deben ser consecutivas (deben estar separadas)." });
+
+        var minusculas = model.PasswordNueva.Count(char.IsLower);
+        if (minusculas < 2)
+            return BadRequest(new { mensaje = "La nueva contraseña debe contener al menos 2 letras minúsculas." });
+
+        if (!model.PasswordNueva.Any(char.IsDigit))
+            return BadRequest(new { mensaje = "La nueva contraseña debe contener al menos un número." });
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(model.PasswordNueva, @"[!@#$%^&*()_+\-=\[\]{};':""\\|,.<>\/?~`]"))
+            return BadRequest(new { mensaje = "La nueva contraseña debe contener al menos un carácter especial o símbolo (!, @, #, $, etc.)." });
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? User.FindFirst("usuario_id")?.Value;
+        if (!long.TryParse(userIdClaim, out var userId))
+            return Unauthorized(new { mensaje = "No se pudo identificar la sesión del usuario." });
+
+        try
+        {
+            var resultado = await _usuarioService.CambiarPasswordAsync(userId, model.PasswordActual, model.PasswordNueva);
+            if (!resultado)
+                return NotFound(new { mensaje = "No se encontró el usuario." });
+
+            return Ok(new { mensaje = "Contraseña actualizada exitosamente." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
         }
         catch (RetryableException)
         {

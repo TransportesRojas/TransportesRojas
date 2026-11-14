@@ -49,41 +49,32 @@ public class SucursalTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task TC_SUC_001_GetSucursales_WithAuth_ReturnsOk()
     {
-        // Arrange
         _client.DefaultRequestHeaders.Add("X-Test-Role", "RH");
 
-        // Act
         var response = await _client.GetAsync("/api/Sucursal");
 
-        // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
     public async Task TC_SUC_002_CreateSucursal_ReturnsCreated()
     {
-        // Arrange
         _client.DefaultRequestHeaders.Add("X-Test-Role", "RH");
         var sucursalNombre = $"SucursalXUnit_{Guid.NewGuid().ToString().Substring(0, 8)}";
         var payload = new { nombre = sucursalNombre, direccion = "Calle de Prueba 123" };
 
-        // Act
         var response = await _client.PostAsJsonAsync("/api/Sucursal", payload);
 
-        // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     [Fact]
     public async Task TC_SUC_003_GetNonExistentSucursal_ReturnsNotFound()
     {
-        // Arrange
         _client.DefaultRequestHeaders.Add("X-Test-Role", "RH");
 
-        // Act
         var response = await _client.GetAsync("/api/Sucursal/999999");
 
-        // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

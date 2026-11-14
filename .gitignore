@@ -51,6 +51,8 @@ appsettings.Local.json
 appsettings.*.json
 !appsettings.json
 !appsettings.example.json
+!appsettings*.json.example
+!appsettings*.example.json
 
 # Variables de entorno y secretos
 .env
@@ -77,7 +79,30 @@ appsettings.*.json
 *.sln.vs1*
 *.ide
 .idea/
+*.DotSettings.user
+.rider/
+.fleet/
 *.swp
+
+# ====================================
+# Pruebas y Reportes (Playwright / xUnit)
+# ====================================
+test-results/
+playwright-report/
+blob-report/
+TestResults/
+coverage/
+*.lcov
+.nyc_output/
+
+# ====================================
+# Docker y Datos Locales
+# ====================================
+.docker/
+docker-data/
+pgdata/
+*.dump
+*.bak
 
 # ====================================
 # Sistema Operativo y Varios
@@ -92,3 +117,13 @@ ehthumbs.db
 # ====================================
 DatosSemilla.txt
 seed_data.sql
+
+# Scripts esenciales de BD (asegurar que se suban a GitHub)
+!database/
+!database/**
+!docker-compose.yml
+
+# Herramientas y agentes locales
+.agents/
+.gemini/
+graphify-out/

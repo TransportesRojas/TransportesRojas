@@ -1,4 +1,5 @@
 using Backend.Exceptions;
+using Backend.Helpers;
 using Backend.Models;
 using Backend.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -19,15 +20,16 @@ public class UnidadController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Supervisor, RH, Jefe de flotilla")]
+    [Authorize(Roles = "Supervisor, Jefe de flotilla, Jefe")]
     public async Task<IActionResult> ObtenerTodos([FromQuery] int skip = 0, [FromQuery] int take = 100)
     {
-        var unidades = await _unidadService.GetUnidadesAsync(skip, take);
+        var contexto = ClaimsUsuarioHelper.Extraer(User);
+        var unidades = await _unidadService.GetUnidadesAsync(contexto, skip, take);
         return Ok(unidades);
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "Supervisor, RH, Jefe de flotilla, Chofer")]
+    [Authorize(Roles = "Supervisor, Jefe de flotilla, Chofer, Jefe")]
     public async Task<IActionResult> ObtenerPorId(long id)
     {
         var unidad = await _unidadService.GetUnidadByIdAsync(id);
@@ -37,7 +39,7 @@ public class UnidadController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Supervisor")]
+    [Authorize(Roles = "Supervisor, Jefe")]
     public async Task<IActionResult> Crear([FromBody] CrearUnidadModel model)
     {
         try
@@ -56,7 +58,7 @@ public class UnidadController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Supervisor")]
+    [Authorize(Roles = "Supervisor, Jefe")]
     public async Task<IActionResult> Actualizar(long id, [FromBody] ActualizarUnidadModel model)
     {
         try
@@ -78,8 +80,31 @@ public class UnidadController : ControllerBase
         }
     }
 
+    [HttpPost("{id}/cierre-dia")]
+    [Authorize(Roles = "Chofer, Supervisor, Jefe de flotilla, Jefe")]
+    public async Task<IActionResult> RegistrarCierreDia(long id, [FromBody] RegistrarOdometroCierreModel model)
+    {
+        try
+        {
+            var exito = await _unidadService.RegistrarCierreDiaAsync(id, model.KmOdometroFinal, model.Observaciones);
+            if (!exito)
+                return NotFound(new { mensaje = $"No se encontró la unidad con Id {id}" });
+
+            var unidad = await _unidadService.GetUnidadByIdAsync(id);
+            return Ok(new { mensaje = "Kilometraje de cierre del día registrado exitosamente.", unidad });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
+        }
+        catch (RetryableException)
+        {
+            return Conflict(new { mensaje = "No se pudo registrar el cierre del día tras múltiples intentos." });
+        }
+    }
+
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Supervisor")]
+    [Authorize(Roles = "Supervisor, Jefe")]
     public async Task<IActionResult> Eliminar(long id)
     {
         try

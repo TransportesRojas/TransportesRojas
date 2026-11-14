@@ -1,5 +1,6 @@
 import { X, Loader2 } from "lucide-react";
 import { type TipoMant, type FormData, TIPOS_VEH } from "./types";
+import { bloquearTeclasNoNumericas } from "../../../utils/inputValidation";
 
 interface TipoMantModalFormProps {
   abierto: boolean;
@@ -59,14 +60,14 @@ export function TipoMantModalForm({
               />
             </div>
             <div className="cc-field cc-field--wide">
-              <label htmlFor="ftm-desc">Descripcion</label>
+              <label htmlFor="ftm-desc">Descripción</label>
               <input
                 id="ftm-desc"
                 name="descripcion"
                 type="text"
                 value={form.descripcion ?? ""}
                 onChange={onChange}
-                placeholder="Descripcion"
+                placeholder="Descripción"
               />
             </div>
             <div className="cc-field">
@@ -74,22 +75,23 @@ export function TipoMantModalForm({
               <input
                 id="ftm-km"
                 name="kmIntervalo"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={form.kmIntervalo ?? ""}
+                onKeyDown={(e) => bloquearTeclasNoNumericas(e, false)}
                 onChange={onChange}
                 placeholder="Ej: 5000"
-                min={0}
               />
             </div>
             <div className="cc-field">
-              <label htmlFor="ftm-aplica">Aplica a tipo vehiculo</label>
+              <label htmlFor="ftm-aplica">Aplica a tipo de vehículo</label>
               <input
                 id="ftm-aplica"
                 name="aplicaATipoVehiculo"
                 type="text"
                 value={form.aplicaATipoVehiculo ?? ""}
                 onChange={onChange}
-                placeholder="Ej: Camion"
+                placeholder="Ej: Camión"
                 list="tipos-veh-list"
               />
               <datalist id="tipos-veh-list">

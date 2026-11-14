@@ -6,9 +6,13 @@ import {
   ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
+  Shield,
 } from "lucide-react";
 import "../estilos/cruds.css";
 import { fetchApi } from "../../../services/api";
+import { useToast } from "../../../components/Toast";
+import { extraerMensajeErrorApi } from "../../../utils/errorMessages";
+import { hasPermissionOrRole, getSession } from "../../../utils/auth";
 import {
   type Rol,
   type FormData,
@@ -21,6 +25,7 @@ import {
 } from "./types";
 import { RolModalForm } from "./RolModalForm";
 import { RolModalDelete } from "./RolModalDelete";
+import { RolModalPermisos } from "./RolModalPermisos";
 import {
   TablaGenerica,
   type ColumnDef,
@@ -29,8 +34,8 @@ import {
 } from "../../../components/TablaGenerica";
 
 function exportarExcel(datos: Rol[]) {
-  const cols = ["ID", "Nombre", "Descripcion"];
-  const rows = datos.map((r) => [r.id, r.nombre, r.descripcion ?? ""]);
+  const cols = ["#", "Nombre", "Descripción"];
+  const rows = datos.map((r) => [`#${r.id}`, r.nombre, r.descripcion ?? ""]);
   const csv = [cols, ...rows]
     .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
     .join("\r\n");
@@ -44,6 +49,7 @@ function exportarExcel(datos: Rol[]) {
 }
 
 export default function CrudRoles() {
+  const { toast } = useToast();
   const [items, setItems] = useState<Rol[]>([]);
   const [, setLoading] = useState(false);
 
@@ -53,11 +59,12 @@ export default function CrudRoles() {
       const data = await fetchApi("/Rol");
       setItems(data);
     } catch (error) {
-      console.error("Error", error);
+      console.error("Error al cargar roles", error);
+      toast.error("Error al cargar roles del sistema.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     cargarDatos();
@@ -66,6 +73,7 @@ export default function CrudRoles() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [filters, setFilters] = useState<Filters>(FILTERS_VACIO);
+  const [busquedaGlobal, setBusquedaGlobal] = useState("");
   const [sortCol, setSortCol] = useState<SortCol>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -76,7 +84,17 @@ export default function CrudRoles() {
   const [confirmInput, setConfirmInput] = useState("");
   const [eliminando, setEliminando] = useState(false);
 
+  const [rolPermisos, setRolPermisos] = useState<Rol | null>(null);
+
   const filtered = items.filter((r) => {
+    if (busquedaGlobal.trim()) {
+      const q = busquedaGlobal.toLowerCase();
+      const match = [r.id, r.nombre, r.descripcion].some((val) =>
+        String(val ?? "").toLowerCase().includes(q)
+      );
+      if (!match) return false;
+    }
+
     const m = (v: string | number | null, f: string) =>
       !f ||
       String(v ?? "")
@@ -106,6 +124,7 @@ export default function CrudRoles() {
       if (e.key === "Escape") {
         setModalAbierto(false);
         setConfirmando(null);
+        setRolPermisos(null);
       }
     };
     document.addEventListener("keydown", h);
@@ -140,33 +159,40 @@ export default function CrudRoles() {
 
   const abrirEditar = useCallback((r: Rol) => {
     setEditando(r);
-    setForm({ nombre: r.nombre, descripcion: r.descripcion ?? "" });
+    setForm({
+      nombre: r.nombre,
+      descripcion: r.descripcion ?? "",
+    });
     setModalAbierto(true);
   }, []);
 
   const guardar = useCallback(async () => {
+    if (guardando) return;
     setGuardando(true);
     try {
       if (editando) {
-        await fetchApi(`/Rol/${editando.id}`, {
+        const actualizado = await fetchApi(`/Rol/${editando.id}`, {
           method: 'PUT',
           body: JSON.stringify(form)
         });
-        setItems((prev) => prev.map((r) => (r.id === editando.id ? { ...r, ...form } : r)));
+        setItems((prev) => prev.map((r) => (r.id === editando.id ? actualizado : r)));
+        toast.success(`Rol "${form.nombre}" actualizado correctamente.`);
       } else {
         const nuevo = await fetchApi('/Rol', {
           method: 'POST',
           body: JSON.stringify(form)
         });
         setItems((prev) => [...prev, nuevo]);
+        toast.success(`Rol "${form.nombre}" registrado exitosamente.`);
       }
       setModalAbierto(false);
-    } catch (error) {
-      console.error("Error al guardar", error);
+    } catch (error: any) {
+      console.error("Error al guardar rol", error);
+      toast.error(extraerMensajeErrorApi(error, "Error al procesar el rol."));
     } finally {
       setGuardando(false);
     }
-  }, [editando, form]);
+  }, [editando, form, guardando, toast]);
 
   const abrirConfirmar = useCallback((r: Rol) => {
     setConfirmInput("");
@@ -174,66 +200,113 @@ export default function CrudRoles() {
   }, []);
 
   const eliminar = useCallback(async () => {
-    if (!confirmando) return;
+    if (!confirmando || eliminando) return;
     setEliminando(true);
     try {
       await fetchApi(`/Rol/${confirmando.id}`, { method: 'DELETE' });
       setItems((prev) => prev.filter((r) => r.id !== confirmando.id));
+      toast.info(`Rol "${confirmando.nombre}" eliminado.`);
       setConfirmando(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al eliminar", error);
+      toast.error(extraerMensajeErrorApi(error, "Error al eliminar el rol."));
     } finally {
       setEliminando(false);
     }
-  }, [confirmando]);
+  }, [confirmando, eliminando, toast]);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
   const columns: ColumnDef<Rol>[] = [
-    { key: "id", label: "ID" },
-    { key: "nombre", label: "Nombre" },
-    { key: "descripcion", label: "Descripcion", render: (r) => r.descripcion ?? "-" },
+    {
+      key: "nombre",
+      label: "Rol",
+      render: (r) => (
+        <span className="font-bold text-slate-800 text-xs">{r.nombre}</span>
+      ),
+    },
+    {
+      key: "descripcion",
+      label: "Descripción",
+      render: (r) => r.descripcion || <span className="text-slate-400 italic">Sin descripción</span>,
+    },
   ];
 
   const filterDefs: FilterDef[] = [
-    { key: "id", type: "text", placeholder: "Filtrar" },
-    { key: "nombre", type: "text", placeholder: "Filtrar" },
-    { key: "descripcion", type: "text", placeholder: "Filtrar" },
+    {
+      key: "nombre",
+      label: "Rol",
+      type: "select",
+      options: [
+        { value: "", label: "Todos los roles" },
+        ...items.map((r) => ({ value: r.nombre, label: r.nombre })),
+      ],
+    },
   ];
 
+  const rolesAdminRol = ["RH", "Jefe"];
+  const puedeCrear = hasPermissionOrRole("rol.administrar", rolesAdminRol);
+  const puedeEditar = hasPermissionOrRole("rol.administrar", rolesAdminRol);
+  const puedeEliminar = hasPermissionOrRole("rol.administrar", rolesAdminRol);
+
+  const session = getSession();
+  const userRoles = (session.roles || []).map((r) => r.trim().toLowerCase());
+  const esSoloRH = userRoles.includes("rh") && !userRoles.includes("jefe");
+
+  const esRolProtegidoParaRH = (r: Rol) => {
+    const n = (r.nombre || "").trim().toLowerCase();
+    return n === "rh" || n === "jefe";
+  };
+
   const actions: ActionDef<Rol>[] = [
-    {
-      label: "Editar",
-      icon: <Pencil size={14} />,
-      className: "cc-dropdown-item--edit",
-      onClick: abrirEditar,
-    },
-    {
-      label: "Eliminar",
-      icon: <Trash2 size={14} />,
-      className: "cc-dropdown-item--delete",
-      onClick: abrirConfirmar,
-    },
+    ...(puedeEditar
+      ? [
+          {
+            label: "Editar",
+            icon: <Pencil size={14} />,
+            className: "cc-dropdown-item--edit",
+            onClick: abrirEditar,
+            visible: (r: Rol) => !esSoloRH || !esRolProtegidoParaRH(r),
+          },
+          {
+            label: "Asignar Permisos",
+            icon: <Shield size={14} />,
+            className: "text-emerald-700 hover:bg-emerald-50",
+            onClick: (r: Rol) => setRolPermisos(r),
+            visible: (r: Rol) => !esSoloRH || !esRolProtegidoParaRH(r),
+          },
+        ]
+      : []),
+    ...(puedeEliminar
+      ? [
+          {
+            label: "Eliminar",
+            icon: <Trash2 size={14} />,
+            className: "cc-dropdown-item--delete",
+            onClick: abrirConfirmar,
+            visible: (r: Rol) => !esSoloRH || !esRolProtegidoParaRH(r),
+          },
+        ]
+      : []),
   ];
 
   return (
     <div className="cc-page">
       <div className="cc-header">
         <div className="cc-title-group">
-          <h1 className="cc-title">Roles</h1>
-          <span className="cc-badge">
-            {filtered.length} de {items.length}
-          </span>
+          <h1 className="cc-title">Roles de Acceso</h1>
         </div>
-        <button
-          id="btn-agregar-rol"
-          className="cc-btn-add"
-          onClick={abrirAgregar}
-        >
-          <Plus size={17} strokeWidth={2.5} />
-          <span>Nuevo rol</span>
-        </button>
+        {puedeCrear && (
+          <button
+            id="btn-agregar-rol"
+            className="cc-btn-add"
+            onClick={abrirAgregar}
+          >
+            <Plus size={17} strokeWidth={2.5} />
+            <span>Nuevo rol</span>
+          </button>
+        )}
       </div>
 
       <TablaGenerica<Rol>
@@ -247,6 +320,17 @@ export default function CrudRoles() {
         onFilterChange={onFilterChange}
         actions={actions}
         idAccessor={(r) => r.id}
+        busquedaGlobal={busquedaGlobal}
+        onBusquedaGlobalChange={(val) => {
+          setBusquedaGlobal(val);
+          setPage(0);
+        }}
+        onLimpiarFiltros={() => {
+          setFilters(FILTERS_VACIO);
+          setBusquedaGlobal("");
+          setPage(0);
+        }}
+        placeholderGlobal="Buscar roles por nombre o descripción..."
       />
 
       <div className="cc-footer-bar">
@@ -277,7 +361,7 @@ export default function CrudRoles() {
               </option>
             ))}
           </select>
-          <span className="cc-pagesize-label">por pagina</span>
+          <span className="cc-pagesize-label">por página</span>
         </div>
         <div className="cc-pagination">
           <button
@@ -335,6 +419,13 @@ export default function CrudRoles() {
         confirmInput={confirmInput}
         setConfirmInput={setConfirmInput}
         eliminando={eliminando}
+      />
+
+      <RolModalPermisos
+        abierto={Boolean(rolPermisos)}
+        rol={rolPermisos}
+        onClose={() => setRolPermisos(null)}
+        onGuardado={cargarDatos}
       />
     </div>
   );

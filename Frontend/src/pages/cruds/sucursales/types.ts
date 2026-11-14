@@ -1,6 +1,8 @@
 export interface Sucursal {
   id: number;
   nombre: string;
+  nombreCorto?: string | null;
+  codigo?: string | null;
   calle: string | null;
   municipio: string | null;
   estado: string | null;
@@ -15,6 +17,8 @@ export type SortCol = keyof Sucursal | null;
 export interface Filters {
   id: string;
   nombre: string;
+  nombreCorto: string;
+  codigo: string;
   calle: string;
   municipio: string;
   estado: string;
@@ -24,6 +28,8 @@ export interface Filters {
 
 export const FORM_VACIO: FormData = {
   nombre: "",
+  nombreCorto: "",
+  codigo: "",
   calle: "",
   municipio: "",
   estado: "",
@@ -34,6 +40,8 @@ export const FORM_VACIO: FormData = {
 export const FILTERS_VACIO: Filters = {
   id: "",
   nombre: "",
+  nombreCorto: "",
+  codigo: "",
   calle: "",
   municipio: "",
   estado: "",

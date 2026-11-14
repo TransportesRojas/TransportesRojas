@@ -57,14 +57,14 @@ export function RolModalForm({
               />
             </div>
             <div className="cc-field cc-field--wide">
-              <label htmlFor="fr-desc">Descripcion</label>
+              <label htmlFor="fr-desc">Descripción</label>
               <input
                 id="fr-desc"
                 name="descripcion"
                 type="text"
                 value={form.descripcion ?? ""}
                 onChange={onChange}
-                placeholder="Descripcion opcional"
+                placeholder="Descripción opcional"
               />
             </div>
           </div>

@@ -35,7 +35,7 @@ export function RolModalDelete({
           Eliminar rol
         </h2>
         <p className="cc-confirm-desc">
-          Estas seguro de que quieres eliminar el rol con el ID{" "}
+          ¿Estás seguro de que deseas eliminar el rol con el ID{" "}
           <strong className="cc-confirm-id">{confirmando.id}</strong>?
         </p>
         <p className="cc-confirm-name">{confirmando.nombre}</p>
@@ -82,7 +82,7 @@ export function RolModalDelete({
               </>
             ) : (
               <>
-                <Trash2 size={15} /> Si, eliminar
+                <Trash2 size={15} /> Sí, eliminar
               </>
             )}
           </button>

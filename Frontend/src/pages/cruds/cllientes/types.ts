@@ -7,6 +7,7 @@ export interface Cliente {
   telefono: string;
   email: string;
   activo: boolean;
+  motivoEdicion?: string | null;
 }
 
 export type FormData = Omit<Cliente, "id">;
@@ -32,6 +33,7 @@ export const FORM_VACIO: FormData = {
   telefono: "",
   email: "",
   activo: true,
+  motivoEdicion: "",
 };
 
 export const FILTERS_VACIO: Filters = {
@@ -42,7 +44,7 @@ export const FILTERS_VACIO: Filters = {
   telefono: "",
   email: "",
   usuarioId: "",
-  activo: "",
+  activo: "si",
 };
 
 export const OPCIONES_PAGINA = [10, 25, 50, 100] as const;

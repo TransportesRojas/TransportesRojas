@@ -1,0 +1,1329 @@
+-- =====================================================================
+-- BASE DE DATOS — TRANSPORTES ROJAS
+-- Motor: PostgreSQL 17
+-- Versión: 11.0 (Catálogos INEGI + SEPOMEX, cobertura nacional, horarios normalizados, triggers y validaciones)
+-- =====================================================================
+
+-- =====================================================================
+-- PARTE 1: ESTRUCTURA (DDL)
+-- =====================================================================
+
+-- 0. EXTENSIONES Y FUNCIONES AUXILIARES
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 1. CATÁLOGOS GEOGRÁFICOS (INEGI AGEEML + SEPOMEX) Y DIRECCIONES
+
+-- 1.1 CATÁLOGO DE ENTIDADES FEDERATIVAS (INEGI)
+-- Encabezados origen: CVEGEO, CVE_ENT, NOM_ENT, NOM_ABR, POB_TOTAL, POB_MASCULINA, POB_FEMENINA, TOTAL DE VIVIENDAS HABITADAS
+CREATE TABLE cat_estado (
+    id          SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    cvegeo      CHAR(2)  NOT NULL UNIQUE, -- Ej. '01'
+    cve_ent     CHAR(2)  NOT NULL UNIQUE, -- Ej. '01'
+    nombre      TEXT     NOT NULL,        -- NOM_ENT: 'Aguascalientes'
+    abreviatura TEXT     NOT NULL,        -- NOM_ABR: 'Ags.'
+    activo      BOOLEAN  NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX idx_cat_estado_nombre ON cat_estado(nombre);
+
+-- 1.2 CATÁLOGO DE MUNICIPIOS (INEGI)
+-- Encabezados origen: CVEGEO, CVE_ENT, NOM_ENT, NOM_ABR, CVE_MUN, NOM_MUN, CVE_CAB, NOM_CAB, POB_TOTAL, POB_MASCULINA, POB_FEMENINA, TOTAL DE VIVIENDAS HABITADAS
+CREATE TABLE cat_municipio (
+    id          INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    estado_id   SMALLINT NOT NULL REFERENCES cat_estado(id),
+    cvegeo      CHAR(5)  NOT NULL UNIQUE, -- Ej. '01001' (CVE_ENT + CVE_MUN)
+    cve_ent     CHAR(2)  NOT NULL,        -- Ej. '01'
+    cve_mun     CHAR(3)  NOT NULL,        -- Ej. '001'
+    nombre      TEXT     NOT NULL,        -- NOM_MUN: 'Aguascalientes'
+    cve_cab     CHAR(4),                  -- CVE_CAB: '0001'
+    nom_cab     TEXT,                     -- NOM_CAB: 'Aguascalientes'
+    activo      BOOLEAN  NOT NULL DEFAULT TRUE,
+    UNIQUE (estado_id, cve_mun),
+    UNIQUE (cve_ent, cve_mun)
+);
+
+CREATE INDEX idx_cat_municipio_estado ON cat_municipio(estado_id);
+CREATE INDEX idx_cat_municipio_nombre ON cat_municipio(nombre);
+
+-- 1.3 CATÁLOGO DE LOCALIDADES (INEGI)
+-- Encabezados origen: CVEGEO, Estatus, CVE_ENT, NOM_ENT, NOM_ABR, CVE_MUN, NOM_MUN, CVE_LOC, NOM_LOC, AMBITO, LATITUD, LONGITUD, LAT_DECIMAL, LON_DECIMAL, ALTITUD, CVE_CARTA, POB_TOTAL, POB_MASCULINA, POB_FEMENINA, TOTAL DE VIVIENDAS HABITADAS
+CREATE TABLE cat_localidad (
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    estado_id    SMALLINT     NOT NULL REFERENCES cat_estado(id),
+    municipio_id INT          NOT NULL REFERENCES cat_municipio(id),
+    cvegeo       CHAR(9)      NOT NULL UNIQUE, -- Ej. '010010001' (CVE_ENT + CVE_MUN + CVE_LOC)
+    estatus      TEXT,                         -- Columna 'Estatus'
+    cve_ent      CHAR(2)      NOT NULL,        -- Ej. '01'
+    cve_mun      CHAR(3)      NOT NULL,        -- Ej. '001'
+    cve_loc      CHAR(4)      NOT NULL,        -- Ej. '0001'
+    nombre       TEXT         NOT NULL,        -- NOM_LOC: 'AGUASCALIENTES'
+    ambito       CHAR(1)      CHECK (ambito IN ('U', 'R')), -- 'U' = Urbano, 'R' = Rural
+    lat_decimal  NUMERIC(10,7),                -- LAT_DECIMAL: 21.8798220
+    lon_decimal  NUMERIC(10,7),                -- LON_DECIMAL: -102.2960460
+    altitud      INT,                          -- ALTITUD: 1878
+    activo       BOOLEAN      NOT NULL DEFAULT TRUE,
+    UNIQUE (municipio_id, cve_loc),
+    UNIQUE (cve_ent, cve_mun, cve_loc)
+);
+
+CREATE INDEX idx_cat_localidad_municipio ON cat_localidad(municipio_id);
+CREATE INDEX idx_cat_localidad_estado    ON cat_localidad(estado_id);
+CREATE INDEX idx_cat_localidad_nombre    ON cat_localidad(nombre);
+
+-- 1.4 CATÁLOGO DE CÓDIGOS POSTALES Y ASENTAMIENTOS / COLONIAS (SEPOMEX)
+-- Encabezados origen: d_codigo, d_asenta, d_tipo_asenta, D_mnpio, d_estado, d_ciudad, d_CP, c_estado, c_oficina, c_CP, c_tipo_asenta, c_mnpio, id_asenta_cpcons, d_zona, c_cve_ciudad
+CREATE TABLE cat_asentamiento (
+    id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    estado_id        SMALLINT NOT NULL REFERENCES cat_estado(id),
+    municipio_id     INT      NOT NULL REFERENCES cat_municipio(id),
+    d_codigo         CHAR(5)  NOT NULL, -- Código Postal del asentamiento (Ej. '20000')
+    d_asenta         TEXT     NOT NULL, -- Nombre de la colonia/asentamiento (Ej. 'Aguascalientes Centro')
+    d_tipo_asenta    TEXT     NOT NULL, -- Tipo de asentamiento (Ej. 'Colonia', 'Fraccionamiento')
+    d_ciudad         TEXT,              -- Nombre de la ciudad (Ej. 'Aguascalientes')
+    d_cp             CHAR(5),           -- CP de la Administración Postal que reparte (Ej. '20001')
+    c_estado         CHAR(2)  NOT NULL, -- Clave Entidad INEGI (Ej. '01')
+    c_oficina        CHAR(5),           -- Clave de oficina postal (Ej. '20001')
+    c_cp             TEXT,              -- Campo c_CP del catálogo SEPOMEX
+    c_tipo_asenta    CHAR(2),           -- Clave tipo de asentamiento (Ej. '09')
+    c_mnpio          CHAR(3)  NOT NULL, -- Clave Municipio INEGI (Ej. '001')
+    id_asenta_cpcons CHAR(4)  NOT NULL, -- Identificador único del asentamiento a nivel municipal (Ej. '0001')
+    d_zona           TEXT,              -- Zona: 'Urbano', 'Rural', 'Semiurbano'
+    c_cve_ciudad     CHAR(2),           -- Clave de ciudad (Ej. '01')
+    activo           BOOLEAN  NOT NULL DEFAULT TRUE,
+    UNIQUE (c_estado, c_mnpio, id_asenta_cpcons, d_codigo)
+);
+
+CREATE INDEX idx_cat_asentamiento_cp        ON cat_asentamiento(d_codigo);
+CREATE INDEX idx_cat_asentamiento_municipio ON cat_asentamiento(municipio_id);
+CREATE INDEX idx_cat_asentamiento_estado    ON cat_asentamiento(estado_id);
+CREATE INDEX idx_cat_asentamiento_nombre    ON cat_asentamiento(d_asenta);
+
+-- 1.5 DIRECCIÓN
+CREATE TABLE direccion (
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    -- Referencias normalizadas a catálogos INEGI / SEPOMEX
+    estado_id       SMALLINT REFERENCES cat_estado(id),
+    municipio_id    INT      REFERENCES cat_municipio(id),
+    localidad_id    BIGINT   REFERENCES cat_localidad(id),
+    asentamiento_id BIGINT   REFERENCES cat_asentamiento(id),
+
+    -- Datos de vialidad y domicilio
+    calle           TEXT,
+    numero_exterior TEXT,
+    numero_interior TEXT,
+    entre_calles    TEXT,
+
+    -- Campos textuales (se autocompletan desde los catálogos si se envían los IDs, o sirven de respaldo)
+    colonia         TEXT,
+    localidad       TEXT,
+    municipio       TEXT,
+    estado          TEXT,
+    pais            TEXT         NOT NULL DEFAULT 'México',
+    codigo_postal   TEXT,
+    referencias     TEXT,
+    latitud         NUMERIC(10,7),
+    longitud        NUMERIC(10,7),
+    metadata        JSONB        NOT NULL DEFAULT '{}'::jsonb,
+    activo          BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_direccion_estado_mun   ON direccion(estado_id, municipio_id);
+CREATE INDEX idx_direccion_localidad    ON direccion(localidad_id);
+CREATE INDEX idx_direccion_asentamiento ON direccion(asentamiento_id);
+CREATE INDEX idx_direccion_cp           ON direccion(codigo_postal);
+
+-- Trigger para mantener sincronizados los nombres y coordenadas por defecto en direccion
+CREATE OR REPLACE FUNCTION trg_fn_direccion_sincronizar_catalogo()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_asenta RECORD;
+    v_loc    RECORD;
+    v_mun    RECORD;
+    v_est    RECORD;
+BEGIN
+    -- 1. Si se especifica asentamiento_id (SEPOMEX), autocompletar colonia, CP, municipio_id y estado_id
+    IF NEW.asentamiento_id IS NOT NULL THEN
+        SELECT d_asenta, d_codigo, municipio_id, estado_id, d_ciudad
+          INTO v_asenta
+          FROM cat_asentamiento
+         WHERE id = NEW.asentamiento_id;
+
+        IF FOUND THEN
+            NEW.colonia       := COALESCE(NEW.colonia, v_asenta.d_asenta);
+            NEW.codigo_postal := COALESCE(NEW.codigo_postal, v_asenta.d_codigo);
+            NEW.municipio_id  := COALESCE(NEW.municipio_id, v_asenta.municipio_id);
+            NEW.estado_id     := COALESCE(NEW.estado_id, v_asenta.estado_id);
+            NEW.localidad     := COALESCE(NEW.localidad, v_asenta.d_ciudad);
+        END IF;
+    END IF;
+
+    -- 2. Si se especifica localidad_id (INEGI), autocompletar localidad, coordenadas por defecto, municipio_id y estado_id
+    IF NEW.localidad_id IS NOT NULL THEN
+        SELECT nombre, lat_decimal, lon_decimal, municipio_id, estado_id
+          INTO v_loc
+          FROM cat_localidad
+         WHERE id = NEW.localidad_id;
+
+        IF FOUND THEN
+            NEW.localidad    := COALESCE(NEW.localidad, v_loc.nombre);
+            NEW.latitud      := COALESCE(NEW.latitud, v_loc.lat_decimal);
+            NEW.longitud     := COALESCE(NEW.longitud, v_loc.lon_decimal);
+            NEW.municipio_id := COALESCE(NEW.municipio_id, v_loc.municipio_id);
+            NEW.estado_id    := COALESCE(NEW.estado_id, v_loc.estado_id);
+        END IF;
+    END IF;
+
+    -- 3. Si se especifica municipio_id, autocompletar nombre de municipio y estado_id
+    IF NEW.municipio_id IS NOT NULL THEN
+        SELECT nombre, estado_id
+          INTO v_mun
+          FROM cat_municipio
+         WHERE id = NEW.municipio_id;
+
+        IF FOUND THEN
+            NEW.municipio := COALESCE(NEW.municipio, v_mun.nombre);
+            NEW.estado_id := COALESCE(NEW.estado_id, v_mun.estado_id);
+        END IF;
+    END IF;
+
+    -- 4. Si se especifica estado_id, autocompletar nombre de estado
+    IF NEW.estado_id IS NOT NULL THEN
+        SELECT nombre
+          INTO v_est
+          FROM cat_estado
+         WHERE id = NEW.estado_id;
+
+        IF FOUND THEN
+            NEW.estado := COALESCE(NEW.estado, v_est.nombre);
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_direccion_sincronizar_catalogo
+BEFORE INSERT OR UPDATE ON direccion
+FOR EACH ROW EXECUTE FUNCTION trg_fn_direccion_sincronizar_catalogo();
+
+CREATE TRIGGER trg_direccion_updated BEFORE UPDATE ON direccion FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- SUCURSAL (Sin el campo de horario de texto, ese se maneja en tabla aparte)
+CREATE TABLE sucursal (
+    id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre            TEXT NOT NULL,
+    nombre_corto      TEXT, 
+    codigo            TEXT UNIQUE,
+    direccion_id      BIGINT REFERENCES direccion(id),
+    telefono          TEXT,
+    email             TEXT,
+    cobertura         TEXT, 
+    responsable_id    BIGINT, -- La FK se agrega más abajo
+    activo            BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_sucursal_updated BEFORE UPDATE ON sucursal FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX idx_sucursal_nombre_corto ON sucursal(nombre_corto);
+
+-- COBERTURA DE SUCURSAL A NIVEL NACIONAL (Permite determinar qué sucursal atiende cada estado/municipio/CP)
+CREATE TABLE sucursal_cobertura (
+    id                 BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sucursal_id        BIGINT   NOT NULL REFERENCES sucursal(id) ON DELETE CASCADE,
+    estado_id          SMALLINT NOT NULL REFERENCES cat_estado(id),
+    municipio_id       INT      REFERENCES cat_municipio(id), -- NULL = cubre todo el estado
+    codigo_postal      CHAR(5),                               -- NULL = cubre todo el municipio/estado
+    aplica_entrega     BOOLEAN  NOT NULL DEFAULT TRUE,
+    es_zona_extendida  BOOLEAN  NOT NULL DEFAULT FALSE,
+    dias_estimados     SMALLINT NOT NULL DEFAULT 1 CHECK (dias_estimados > 0),
+    activo             BOOLEAN  NOT NULL DEFAULT TRUE,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE NULLS NOT DISTINCT (sucursal_id, estado_id, municipio_id, codigo_postal)
+);
+
+CREATE INDEX idx_suc_cobertura_sucursal  ON sucursal_cobertura(sucursal_id);
+CREATE INDEX idx_suc_cobertura_estado    ON sucursal_cobertura(estado_id);
+CREATE INDEX idx_suc_cobertura_municipio ON sucursal_cobertura(municipio_id);
+CREATE INDEX idx_suc_cobertura_cp        ON sucursal_cobertura(codigo_postal);
+
+CREATE TABLE rol (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre      TEXT NOT NULL UNIQUE,
+    descripcion TEXT
+);
+
+CREATE TABLE puesto (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre      TEXT NOT NULL UNIQUE,
+    descripcion TEXT
+);
+
+-- 2. PERMISOS
+CREATE TABLE permiso (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    codigo      TEXT NOT NULL UNIQUE,
+    nombre      TEXT NOT NULL,
+    descripcion TEXT,
+    modulo      TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_permiso_modulo ON permiso(modulo);
+
+CREATE TABLE rol_permiso (
+    rol_id     BIGINT NOT NULL REFERENCES rol(id)     ON DELETE CASCADE,
+    permiso_id BIGINT NOT NULL REFERENCES permiso(id) ON DELETE CASCADE,
+    PRIMARY KEY (rol_id, permiso_id)
+);
+
+CREATE INDEX idx_rol_permiso_permiso ON rol_permiso(permiso_id);
+
+-- 3. USUARIOS, PERSONAL Y CLIENTES
+CREATE TABLE usuario (
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    tipo_usuario  TEXT NOT NULL CHECK (tipo_usuario IN ('empleado','cliente','sistema')),
+    activo        BOOLEAN      NOT NULL DEFAULT TRUE,
+    ultimo_acceso TIMESTAMPTZ,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_usuario_updated BEFORE UPDATE ON usuario FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE usuario_rol (
+    usuario_id BIGINT NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+    rol_id     BIGINT NOT NULL REFERENCES rol(id)     ON DELETE CASCADE,
+    PRIMARY KEY (usuario_id, rol_id)
+);
+
+CREATE INDEX idx_usuario_rol_rol ON usuario_rol(rol_id);
+
+CREATE TABLE empleado (
+    id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    usuario_id       BIGINT       NOT NULL UNIQUE REFERENCES usuario(id),
+    sucursal_id      BIGINT       REFERENCES sucursal(id),
+    nombre           TEXT NOT NULL,
+    apellido_paterno TEXT NOT NULL,
+    apellido_materno TEXT,
+    telefono         TEXT,
+    email            TEXT,
+    fecha_ingreso    DATE,
+    activo           BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_empleado_updated BEFORE UPDATE ON empleado FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX idx_empleado_sucursal ON empleado(sucursal_id);
+
+-- AHORA SÍ: Agregamos la llave foránea circular de Sucursal -> Empleado
+ALTER TABLE sucursal 
+ADD CONSTRAINT fk_sucursal_responsable 
+FOREIGN KEY (responsable_id) REFERENCES empleado(id);
+
+CREATE TABLE empleado_puesto_historial (
+    id                 BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    empleado_id        BIGINT NOT NULL REFERENCES empleado(id),
+    puesto_id          BIGINT NOT NULL REFERENCES puesto(id),
+    puesto_anterior_id BIGINT REFERENCES puesto(id), 
+    fecha_inicio       DATE   NOT NULL,
+    fecha_fin          DATE,
+    motivo             TEXT,
+    registrado_por     BIGINT REFERENCES empleado(id),
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_fechas_puesto CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio)
+);
+
+CREATE INDEX idx_emp_puesto_hist_emp ON empleado_puesto_historial(empleado_id);
+
+CREATE TABLE usuario_estado_historial (
+    id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    usuario_id     BIGINT NOT NULL REFERENCES usuario(id),
+    estado         TEXT NOT NULL CHECK (estado IN ('activo','suspendido','inhabilitado','baja')),
+    motivo         TEXT,
+    fecha_inicio   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_fin      TIMESTAMPTZ,
+    registrado_por BIGINT REFERENCES empleado(id)
+);
+
+CREATE INDEX idx_usuario_estado_hist ON usuario_estado_historial(usuario_id);
+
+CREATE TABLE cliente (
+    id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    usuario_id       BIGINT NOT NULL UNIQUE REFERENCES usuario(id),
+    nombre           TEXT,
+    apellido_paterno TEXT,
+    apellido_materno TEXT,
+    telefono         TEXT,
+    email            TEXT,
+    motivo_edicion   TEXT,
+    activo           BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_cliente_updated BEFORE UPDATE ON cliente FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX idx_cliente_nombre ON cliente(nombre, apellido_paterno);
+
+CREATE TABLE cliente_direccion (
+    id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    cliente_id     BIGINT NOT NULL REFERENCES cliente(id) ON DELETE CASCADE,
+    direccion_id   BIGINT NOT NULL REFERENCES direccion(id),
+    tipo           TEXT NOT NULL CHECK (tipo IN ('origen','entrega','otra')),
+    predeterminada BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_cliente_direccion_cliente ON cliente_direccion(cliente_id);
+
+-- =====================================================================
+-- TABLA NORMALIZADA DE HORARIOS (Solución propuesta)
+-- =====================================================================
+CREATE TABLE horario_sucursal (
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sucursal_id     BIGINT NOT NULL REFERENCES sucursal(id) ON DELETE CASCADE,
+    dia_semana      INT NOT NULL CHECK (dia_semana BETWEEN 1 AND 7), -- 1=Lunes, 7=Domingo
+    hora_apertura   TIME,
+    hora_cierre     TIME,
+    es_dia_descanso BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Validación: Si no es descanso, debe haber hora de apertura y cierre válida.
+    -- Si es descanso, las horas deben ser nulas.
+    CONSTRAINT chk_horario_valido CHECK (
+        (es_dia_descanso = TRUE AND hora_apertura IS NULL AND hora_cierre IS NULL)
+        OR
+        (es_dia_descanso = FALSE AND hora_apertura IS NOT NULL AND hora_cierre IS NOT NULL AND hora_apertura < hora_cierre)
+    )
+);
+
+CREATE INDEX idx_horario_sucursal ON horario_sucursal(sucursal_id);
+-- =====================================================================
+
+-- 4. FLOTILLAS Y UNIDADES
+CREATE TABLE flotilla (
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sucursal_id   BIGINT REFERENCES sucursal(id),
+    supervisor_id BIGINT REFERENCES empleado(id),
+    nombre        TEXT NOT NULL,
+    codigo        TEXT UNIQUE,
+    activo        BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_flotilla_updated BEFORE UPDATE ON flotilla FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE unidad (
+    id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    flotilla_id           BIGINT REFERENCES flotilla(id),
+    placas                TEXT NOT NULL UNIQUE,
+    tipo_vehiculo         TEXT,
+    marca                 TEXT,
+    modelo                TEXT,
+    anio                  INT,
+    capacidad_kg          NUMERIC(10,2) NOT NULL CHECK (capacidad_kg > 0),
+    km_odometro_inicial   NUMERIC(10,2) CHECK (km_odometro_inicial >= 0),
+    km_odometro_actual    NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (km_odometro_actual >= 0),
+    estado                TEXT NOT NULL DEFAULT 'disponible' CHECK (estado IN ('disponible','asignada','mantenimiento','fuera_servicio')),
+    activo                BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_unidad_updated BEFORE UPDATE ON unidad FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX idx_unidad_flotilla ON unidad(flotilla_id);
+CREATE INDEX idx_unidad_estado   ON unidad(estado);
+
+CREATE TABLE asignacion_flotilla_chofer (
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    flotilla_id  BIGINT NOT NULL REFERENCES flotilla(id),
+    chofer_id    BIGINT NOT NULL REFERENCES empleado(id),
+    fecha_inicio DATE   NOT NULL,
+    fecha_fin    DATE,
+    activo       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_fechas_asignacion CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio)
+);
+
+CREATE INDEX idx_asig_flotilla_flotilla ON asignacion_flotilla_chofer(flotilla_id);
+CREATE INDEX idx_asig_flotilla_chofer   ON asignacion_flotilla_chofer(chofer_id);
+CREATE UNIQUE INDEX uq_asig_chofer_activa ON asignacion_flotilla_chofer(chofer_id) WHERE activo = TRUE;
+
+-- 5. MANTENIMIENTO
+CREATE TABLE tipo_mantenimiento (
+    id                     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre                 TEXT NOT NULL UNIQUE,
+    descripcion            TEXT,
+    km_intervalo           INT NOT NULL CHECK (km_intervalo > 0),
+    aplica_a_tipo_vehiculo TEXT,
+    activo                 BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_tipo_mantenimiento_updated BEFORE UPDATE ON tipo_mantenimiento FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE alerta_mantenimiento (
+    id                      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    unidad_id               BIGINT NOT NULL REFERENCES unidad(id),
+    tipo_mantenimiento_id   BIGINT NOT NULL REFERENCES tipo_mantenimiento(id),
+    km_al_momento           NUMERIC(10,2) NOT NULL,
+    km_umbral               NUMERIC(10,2) NOT NULL,
+    km_ultimo_mantenimiento NUMERIC(10,2),
+    descripcion             TEXT,
+    estado                  TEXT NOT NULL DEFAULT 'nueva' CHECK (estado IN ('nueva','vista','atendida','cerrada')),
+    atendida_por            BIGINT REFERENCES empleado(id),
+    fecha_alerta            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_atencion          TIMESTAMPTZ
+);
+
+CREATE INDEX idx_alerta_mant_unidad ON alerta_mantenimiento(unidad_id);
+CREATE INDEX idx_alerta_mant_estado ON alerta_mantenimiento(estado);
+CREATE INDEX idx_alerta_mant_fecha  ON alerta_mantenimiento(fecha_alerta);
+
+CREATE TABLE mantenimiento (
+    id                     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    unidad_id              BIGINT NOT NULL REFERENCES unidad(id),
+    tipo_mantenimiento_id  BIGINT NOT NULL REFERENCES tipo_mantenimiento(id),
+    alerta_id              BIGINT REFERENCES alerta_mantenimiento(id),
+    fecha_realizado        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    km_al_momento          NUMERIC(10,2) NOT NULL CHECK (km_al_momento >= 0),
+    costo                  NUMERIC(12,2) CHECK (costo IS NULL OR costo >= 0),
+    taller                 TEXT,
+    descripcion            TEXT,
+    evidencia_url          TEXT,
+    realizado_por          BIGINT REFERENCES empleado(id),
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_mant_unidad ON mantenimiento(unidad_id);
+CREATE INDEX idx_mant_tipo   ON mantenimiento(tipo_mantenimiento_id);
+CREATE INDEX idx_mant_fecha  ON mantenimiento(fecha_realizado);
+
+-- 6. ENVÍOS, EVENTOS Y RECEPCIÓN
+CREATE TABLE envio (
+    id                          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    guia                        TEXT NOT NULL UNIQUE,
+    remitente_id                BIGINT NOT NULL REFERENCES cliente(id),
+    destinatario_cliente_id     BIGINT REFERENCES cliente(id),
+    destinatario_nombre         TEXT NOT NULL,
+    destinatario_telefono       TEXT NOT NULL,
+    destinatario_email          TEXT,
+    intento_reparto             INT NOT NULL DEFAULT 0 CHECK (intento_reparto >= 0),
+    sucursal_recepcion_id       BIGINT REFERENCES sucursal(id),
+    sucursal_destino_id         BIGINT REFERENCES sucursal(id),
+    direccion_destino_id        BIGINT REFERENCES direccion(id),
+    direccion_origen_snapshot   JSONB,
+    direccion_destino_snapshot  JSONB,
+    
+    -- Validaciones del paquete
+    peso_kg                     NUMERIC(10,2) NOT NULL CHECK (peso_kg > 0),
+    largo_cm                    NUMERIC(10,2) NOT NULL CHECK (largo_cm > 0),
+    ancho_cm                    NUMERIC(10,2) NOT NULL CHECK (ancho_cm > 0),
+    alto_cm                     NUMERIC(10,2) NOT NULL CHECK (alto_cm > 0),
+    descripcion                 TEXT NOT NULL,
+    
+    valor_declarado             NUMERIC(12,2),
+    codigo_validacion_hash      TEXT,
+    estado                      TEXT NOT NULL DEFAULT 'registrado' CHECK (estado IN ('registrado','recoleccion_programada','recoleccion_realizada','recibido_sucursal','asignado_flotilla','en_ruta','entregado','no_entregado','en_devolucion','devuelto','cancelado','reprogramado')),
+    creado_por_usuario_id       BIGINT REFERENCES usuario(id),
+    fecha_creacion              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_entrega_estimada      TIMESTAMPTZ,
+    metadata                    JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_envio_updated BEFORE UPDATE ON envio FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE INDEX idx_envio_remitente      ON envio(remitente_id);
+CREATE INDEX idx_envio_destinatario   ON envio(destinatario_cliente_id);
+CREATE INDEX idx_envio_guia           ON envio(guia);
+CREATE INDEX idx_envio_estado         ON envio(estado);
+CREATE INDEX idx_envio_sucursal_rec   ON envio(sucursal_recepcion_id);
+CREATE INDEX idx_envio_sucursal_dest  ON envio(sucursal_destino_id);
+CREATE INDEX idx_envio_fecha_creacion ON envio(fecha_creacion);
+CREATE INDEX idx_envio_intento        ON envio(intento_reparto);
+
+CREATE TABLE evento_envio (
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    envio_id     BIGINT NOT NULL REFERENCES envio(id) ON DELETE CASCADE,
+    estado       TEXT NOT NULL,
+    descripcion  TEXT,
+    latitud      NUMERIC(10,7),
+    longitud     NUMERIC(10,7),
+    usuario_id   BIGINT REFERENCES usuario(id),
+    fecha_evento TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_evento_envio_envio ON evento_envio(envio_id, fecha_evento);
+
+CREATE TABLE recepcion_paquete (
+    id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    envio_id            BIGINT NOT NULL REFERENCES envio(id),
+    recibido_por        BIGINT NOT NULL REFERENCES empleado(id),
+    fecha_recepcion     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    peso_verificado_kg  NUMERIC(10,2),
+    largo_verificado_cm NUMERIC(10,2),
+    ancho_verificado_cm NUMERIC(10,2),
+    alto_verificado_cm  NUMERIC(10,2),
+    evidencia_foto_url  TEXT,
+    observaciones       TEXT,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (envio_id)
+);
+
+CREATE INDEX idx_recepcion_envio ON recepcion_paquete(envio_id);
+
+-- 7. AVISOS SMS
+CREATE TABLE aviso_sms (
+    id                 BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    envio_id           BIGINT NOT NULL REFERENCES envio(id),
+    intento_reparto    INT NOT NULL CHECK (intento_reparto > 0),
+    telefono_destino   TEXT NOT NULL,
+    mensaje            TEXT NOT NULL,
+    estado             TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','aceptado_proveedor','pendiente_confirmacion','pendiente_reintento','pendiente_correccion')),
+    id_proveedor       TEXT,
+    intentos_reintento INT NOT NULL DEFAULT 0,
+    fecha_solicitud    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_confirmacion TIMESTAMPTZ,
+    UNIQUE (envio_id, intento_reparto)
+);
+
+CREATE INDEX idx_aviso_sms_envio  ON aviso_sms(envio_id);
+CREATE INDEX idx_aviso_sms_estado ON aviso_sms(estado);
+
+-- 9. RUTAS, ASIGNACIONES Y ENTREGAS
+CREATE TABLE ruta (
+    id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    chofer_id             BIGINT REFERENCES empleado(id),
+    unidad_id             BIGINT REFERENCES unidad(id),
+    flotilla_id           BIGINT REFERENCES flotilla(id),
+    fecha                 DATE NOT NULL,
+    estado                TEXT NOT NULL DEFAULT 'planeada' CHECK (estado IN ('planeada','en_curso','finalizada','cancelada')),
+    origen_sucursal_id    BIGINT REFERENCES sucursal(id),
+    hora_inicio           TIMESTAMPTZ,
+    hora_fin              TIMESTAMPTZ,
+    km_inicial_odometro   NUMERIC(10,2) CHECK (km_inicial_odometro IS NULL OR km_inicial_odometro >= 0),
+    km_final_odometro     NUMERIC(10,2) CHECK (km_final_odometro IS NULL OR km_final_odometro >= 0),
+    km_recorridos         NUMERIC(10,2) GENERATED ALWAYS AS (CASE WHEN km_final_odometro IS NOT NULL AND km_inicial_odometro IS NOT NULL THEN km_final_odometro - km_inicial_odometro ELSE NULL END) STORED,
+    distancia_estimada_km NUMERIC(10,2),
+    tiempo_estimado_min   INT,
+    created_by            BIGINT REFERENCES empleado(id),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_ruta_updated BEFORE UPDATE ON ruta FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX idx_ruta_chofer_fecha ON ruta(chofer_id, fecha);
+CREATE INDEX idx_ruta_unidad_fecha ON ruta(unidad_id, fecha);
+CREATE INDEX idx_ruta_estado       ON ruta(estado);
+
+CREATE TABLE ruta_envio (
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    ruta_id       BIGINT NOT NULL REFERENCES ruta(id) ON DELETE CASCADE,
+    envio_id      BIGINT NOT NULL REFERENCES envio(id),
+    orden_entrega INT    NOT NULL,
+    estado        TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','entregado','fallido','reprogramado')),
+    UNIQUE (ruta_id, envio_id)
+);
+
+CREATE INDEX idx_ruta_envio_envio ON ruta_envio(envio_id);
+
+CREATE TABLE entrega (
+    id                 BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    envio_id           BIGINT NOT NULL REFERENCES envio(id),
+    intento_reparto    INT NOT NULL CHECK (intento_reparto > 0),
+    chofer_id          BIGINT NOT NULL REFERENCES empleado(id),
+    ruta_id            BIGINT REFERENCES ruta(id),
+    fecha_hora         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    codigo_ingresado   TEXT,
+    validado           BOOLEAN NOT NULL DEFAULT FALSE,
+    evidencia_foto_url TEXT,
+    firma_url          TEXT,
+    latitud            NUMERIC(10,7),
+    longitud           NUMERIC(10,7),
+    estado             TEXT NOT NULL CHECK (estado IN ('exitosa','fallida')),
+    observaciones      TEXT,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (envio_id, intento_reparto)
+);
+
+CREATE INDEX idx_entrega_chofer ON entrega(chofer_id);
+
+-- 10. CAMBIOS DE RUTA
+CREATE TABLE cambio_ruta (
+    id                   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    folio                TEXT NOT NULL UNIQUE,
+    ruta_id              BIGINT NOT NULL REFERENCES ruta(id),
+    chofer_id            BIGINT NOT NULL REFERENCES empleado(id),
+    unidad_id            BIGINT REFERENCES unidad(id),
+    motivo               TEXT NOT NULL,
+    referencia_lugar     TEXT,
+    descripcion_trayecto TEXT NOT NULL,
+    fecha_evento         TIMESTAMPTZ NOT NULL,
+    afecta_entrega       BOOLEAN NOT NULL DEFAULT FALSE,
+    estado_aviso         TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado_aviso IN ('enviado','pendiente')),
+    fecha_registro       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_cambio_ruta_ruta   ON cambio_ruta(ruta_id);
+CREATE INDEX idx_cambio_ruta_chofer ON cambio_ruta(chofer_id);
+CREATE INDEX idx_cambio_ruta_fecha  ON cambio_ruta(fecha_evento);
+
+-- 11. TRIGGERS DE MANTENIMIENTO
+CREATE OR REPLACE FUNCTION trg_fn_ruta_actualizar_odometro()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.estado = 'finalizada' AND NEW.km_final_odometro IS NOT NULL AND NEW.unidad_id IS NOT NULL AND (OLD.estado <> 'finalizada' OR OLD.km_final_odometro IS DISTINCT FROM NEW.km_final_odometro) THEN
+        UPDATE unidad SET km_odometro_actual = NEW.km_final_odometro WHERE id = NEW.unidad_id AND NEW.km_final_odometro > km_odometro_actual;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_ruta_actualizar_odometro AFTER UPDATE ON ruta FOR EACH ROW EXECUTE FUNCTION trg_fn_ruta_actualizar_odometro();
+
+CREATE OR REPLACE FUNCTION trg_fn_generar_alerta_mantenimiento()
+RETURNS TRIGGER AS $$
+DECLARE
+    tm RECORD;
+    v_km_ultimo_mantenimiento NUMERIC(10,2);
+    v_km_base NUMERIC(10,2);
+BEGIN
+    IF NEW.km_odometro_actual IS NOT DISTINCT FROM OLD.km_odometro_actual THEN RETURN NEW; END IF;
+
+    FOR tm IN SELECT * FROM tipo_mantenimiento WHERE activo = TRUE AND (aplica_a_tipo_vehiculo IS NULL OR aplica_a_tipo_vehiculo = NEW.tipo_vehiculo)
+    LOOP
+        SELECT MAX(km_al_momento) INTO v_km_ultimo_mantenimiento FROM mantenimiento WHERE unidad_id = NEW.id AND tipo_mantenimiento_id = tm.id;
+        v_km_base := COALESCE(v_km_ultimo_mantenimiento, COALESCE(NEW.km_odometro_inicial, 0));
+
+        IF (NEW.km_odometro_actual - v_km_base) >= tm.km_intervalo THEN
+            IF NOT EXISTS (SELECT 1 FROM alerta_mantenimiento am WHERE am.unidad_id = NEW.id AND am.tipo_mantenimiento_id = tm.id AND am.estado IN ('nueva','vista')) THEN
+                INSERT INTO alerta_mantenimiento (unidad_id, tipo_mantenimiento_id, km_al_momento, km_umbral, km_ultimo_mantenimiento, descripcion, estado) 
+                VALUES (NEW.id, tm.id, NEW.km_odometro_actual, v_km_base + tm.km_intervalo, v_km_ultimo_mantenimiento, 'La unidad requiere ' || tm.nombre || ' (intervalo: ' || tm.km_intervalo || ' km)', 'nueva');
+            END IF;
+        END IF;
+    END LOOP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_unidad_generar_alerta_mantenimiento AFTER UPDATE ON unidad FOR EACH ROW EXECUTE FUNCTION trg_fn_generar_alerta_mantenimiento();
+
+-- 12. DEVOLUCIONES, CANCELACIONES Y RECLAMACIONES
+CREATE TABLE devolucion (
+    id                     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    envio_id               BIGINT NOT NULL REFERENCES envio(id),
+    motivo                 TEXT NOT NULL,
+    origen_solicitud       TEXT NOT NULL CHECK (origen_solicitud IN ('rechazo_destinatario','no_entregable','solicitud_remitente')),
+    estado                 TEXT NOT NULL DEFAULT 'iniciada' CHECK (estado IN ('iniciada','en_transito','recibida_sucursal','entregada_remitente','rechazada_remitente','reclamacion')),
+    evidencia_url          TEXT,
+    sucursal_destino_id    BIGINT REFERENCES sucursal(id),
+    fecha_inicio           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_recepcion        TIMESTAMPTZ,
+    fecha_cierre           TIMESTAMPTZ,
+    aceptada_por_remitente BOOLEAN,
+    observaciones          TEXT
+);
+
+CREATE INDEX idx_devolucion_envio  ON devolucion(envio_id);
+CREATE INDEX idx_devolucion_estado ON devolucion(estado);
+
+CREATE TABLE reclamacion (
+    id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    devolucion_id  BIGINT REFERENCES devolucion(id),
+    envio_id       BIGINT REFERENCES envio(id),
+    motivo         TEXT NOT NULL,
+    estado         TEXT NOT NULL DEFAULT 'abierta' CHECK (estado IN ('abierta','en_revision','resuelta','cerrada')),
+    evidencia_url  TEXT,
+    fecha_apertura TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_cierre   TIMESTAMPTZ
+);
+
+CREATE INDEX idx_reclamacion_envio ON reclamacion(envio_id);
+
+CREATE TABLE cancelacion (
+    id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    envio_id         BIGINT NOT NULL REFERENCES envio(id),
+    motivo           TEXT NOT NULL,
+    actor_tipo       TEXT NOT NULL CHECK (actor_tipo IN ('remitente','chofer','destinatario','sistema')),
+    actor_usuario_id BIGINT REFERENCES usuario(id),
+    estado           TEXT NOT NULL DEFAULT 'solicitada' CHECK (estado IN ('solicitada','aprobada','rechazada','aplicada')),
+    fecha_solicitud  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_aplicacion TIMESTAMPTZ
+);
+
+CREATE INDEX idx_cancelacion_envio ON cancelacion(envio_id);
+
+-- 13. ALERTAS DE RUTA, TELEMETRÍA, INCIDENCIAS Y REPROGRAMACIÓN
+CREATE TABLE alerta (
+    id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    tipo           TEXT NOT NULL CHECK (tipo IN ('desvio_ruta','parada_no_autorizada','incidente','otra')),
+    flotilla_id    BIGINT REFERENCES flotilla(id),
+    unidad_id      BIGINT REFERENCES unidad(id),
+    chofer_id      BIGINT REFERENCES empleado(id),
+    envio_id       BIGINT REFERENCES envio(id),
+    ruta_id        BIGINT REFERENCES ruta(id),
+    descripcion    TEXT,
+    latitud        NUMERIC(10,7),
+    longitud       NUMERIC(10,7),
+    estado         TEXT NOT NULL DEFAULT 'nueva' CHECK (estado IN ('nueva','vista','atendida','cerrada')),
+    atendida_por   BIGINT REFERENCES empleado(id),
+    fecha_alerta   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_atencion TIMESTAMPTZ
+);
+
+CREATE INDEX idx_alerta_estado   ON alerta(estado);
+CREATE INDEX idx_alerta_flotilla ON alerta(flotilla_id);
+CREATE INDEX idx_alerta_fecha    ON alerta(fecha_alerta);
+
+CREATE TABLE telemetria_unidad (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    unidad_id  BIGINT NOT NULL REFERENCES unidad(id),
+    ruta_id    BIGINT REFERENCES ruta(id),
+    latitud    NUMERIC(10,7),
+    longitud   NUMERIC(10,7),
+    fecha_hora TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_telemetria_unidad_fecha ON telemetria_unidad(unidad_id, fecha_hora);
+CREATE INDEX idx_telemetria_ruta_fecha   ON telemetria_unidad(ruta_id, fecha_hora);
+
+CREATE TABLE incidencia (
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    envio_id      BIGINT REFERENCES envio(id),
+    ruta_id       BIGINT REFERENCES ruta(id),
+    tipo          TEXT NOT NULL CHECK (tipo IN ('vial','cliente_ausente','direccion_incorrecta','paquete_danado','otra')),
+    descripcion   TEXT NOT NULL,
+    evidencia_url TEXT,
+    estado        TEXT NOT NULL DEFAULT 'abierta' CHECK (estado IN ('abierta','en_revision','resuelta','cerrada')),
+    fecha_reporte TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_cierre  TIMESTAMPTZ
+);
+
+CREATE INDEX idx_incidencia_envio  ON incidencia(envio_id);
+CREATE INDEX idx_incidencia_estado ON incidencia(estado);
+
+CREATE TABLE reprogramacion (
+    id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    envio_id         BIGINT NOT NULL REFERENCES envio(id),
+    incidencia_id    BIGINT REFERENCES incidencia(id),
+    nueva_fecha_hora TIMESTAMPTZ NOT NULL,
+    motivo           TEXT,
+    estado           TEXT NOT NULL DEFAULT 'programada' CHECK (estado IN ('programada','confirmada','cancelada','atendida')),
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_reprogramacion_envio ON reprogramacion(envio_id);
+
+-- 14. EVALUACIÓN Y QUEJAS
+CREATE TABLE evaluacion (
+    id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    envio_id         BIGINT NOT NULL REFERENCES envio(id),
+    puntuacion       INT NOT NULL CHECK (puntuacion BETWEEN 1 AND 5),
+    comentarios      TEXT,
+    fecha_evaluacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (envio_id)
+);
+
+CREATE INDEX idx_evaluacion_envio ON evaluacion(envio_id);
+
+CREATE TABLE queja (
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    folio         TEXT NOT NULL UNIQUE,
+    envio_id      BIGINT REFERENCES envio(id),
+    motivo        TEXT NOT NULL,
+    descripcion   TEXT,
+    estado        TEXT NOT NULL DEFAULT 'abierta' CHECK (estado IN ('abierta','en_atencion','resuelta','cerrada')),
+    fecha_reporte TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    fecha_cierre  TIMESTAMPTZ,
+    resolucion    TEXT,
+    atendida_por  BIGINT REFERENCES empleado(id)
+);
+
+CREATE INDEX idx_queja_envio  ON queja(envio_id);
+CREATE INDEX idx_queja_estado ON queja(estado);
+CREATE INDEX idx_queja_folio  ON queja(folio);
+
+CREATE TABLE queja_seguimiento (
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    queja_id        BIGINT NOT NULL REFERENCES queja(id) ON DELETE CASCADE,
+    empleado_id     BIGINT NOT NULL REFERENCES empleado(id),
+    accion          TEXT NOT NULL,
+    estado_anterior TEXT,
+    estado_nuevo    TEXT,
+    fecha           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_queja_seg_queja ON queja_seguimiento(queja_id);
+
+-- 15. VISTA DE PERMISOS EFECTIVOS
+CREATE OR REPLACE VIEW usuario_permiso_efectivo AS
+SELECT DISTINCT ur.usuario_id, p.id AS permiso_id, p.codigo AS permiso_codigo, p.modulo AS permiso_modulo
+FROM usuario_rol ur
+JOIN rol_permiso rp ON rp.rol_id = ur.rol_id
+JOIN permiso p      ON p.id = rp.permiso_id;
+
+
+-- =====================================================================
+-- PARTE 2: DATOS SEMILLA (DML)
+-- =====================================================================
+
+-- 2.1 ROLES
+INSERT INTO rol (nombre, descripcion) VALUES
+('Jefe',                    'Máxima autoridad corporativa, asigna roles y supervisa RH'),
+('RH',                      'Recursos Humanos'),
+('Supervisor',              'Supervisor de operaciones'),
+('Jefe de flotilla',        'Planificación de rutas y monitoreo'),
+('Chofer',                  'Operador de unidad'),
+('Personal administrativo', 'Registro y atención al cliente'),
+('Personal de sucursal',    'Recepción de paquetes en sucursal')
+ON CONFLICT (nombre) DO NOTHING;
+
+-- 2.2 PUESTOS
+INSERT INTO puesto (nombre, descripcion) VALUES
+('Gerente General',      'Dirección y máxima autoridad de la empresa'),
+('Recursos Humanos',     'Gestión de personal'),
+('Supervisor',           'Supervisión de operaciones'),
+('Jefe de flotilla',     'Planeación y monitoreo de rutas'),
+('Administrativo',       'Registro de clientes y envíos'),
+('Personal de sucursal', 'Recepción física de paquetes'),
+('Chofer',               'Conductor de unidad de reparto')
+ON CONFLICT (nombre) DO NOTHING;
+
+-- 2.3 PERMISOS
+INSERT INTO permiso (codigo, nombre, modulo, descripcion) VALUES
+('cliente.registrar',      'Registrar cliente',      'clientes', 'Alta de clientes'),
+('cliente.consultar',      'Consultar cliente',      'clientes', 'Consulta de clientes'),
+('cliente.editar',         'Editar cliente',         'clientes', 'Modificación de datos de cliente'),
+('cliente.desactivar',     'Desactivar cliente',     'clientes', 'Baja lógica de cuenta de cliente'),
+('servicio.calificar',     'Calificar servicio',     'clientes', 'Opinión del destinatario sobre la entrega'),
+('empleado.registrar',           'Registrar empleado',           'rh', 'Alta de empleados con rol y acceso'),
+('empleado.consultar',           'Consultar empleado',           'rh', 'Consulta de expediente e historial laboral'),
+('empleado.editar',              'Editar empleado',              'rh', 'Modificación de expediente laboral'),
+('empleado.desactivar',          'Desactivar empleado',          'rh', 'Baja lógica del empleado'),
+('empleado.cambiar_rol',         'Cambiar rol de empleado',      'rh', 'Actualización de roles y permisos'),
+('empleado.suspender_acceso',    'Suspender acceso',             'rh', 'Suspensión temporal de un acceso'),
+('empleado.desactivar_acceso',   'Desactivar acceso',            'rh', 'Baja definitiva de un acceso'),
+('empleado.reactivar_acceso',    'Reactivar acceso',             'rh', 'Reactivación de accesos suspendidos'),
+('puesto.administrar',           'Administrar puestos',          'rh', 'Alta, edición y baja de puestos'),
+('puesto.consultar',             'Consultar puestos',            'rh', 'Consulta de puestos laborales'),
+('sesion.iniciar',       'Iniciar sesión',     'seguridad', 'Autenticación en el sistema'),
+('rol.administrar',      'Administrar roles',  'seguridad', 'Alta, edición y baja de roles'),
+('rol.consultar',        'Consultar roles',    'seguridad', 'Consulta de roles y sus permisos'),
+('permiso.consultar',    'Consultar permisos', 'seguridad', 'Consulta del catálogo de permisos'),
+('usuario.consultar',    'Consultar usuario',  'seguridad', 'Consulta de cuentas de usuario'),
+('usuario.editar',       'Editar usuario',     'seguridad', 'Modificación de datos de cuenta'),
+('sucursal.registrar',  'Registrar sucursal',  'sucursales', 'Alta de sucursales'),
+('sucursal.consultar',  'Consultar sucursal',  'sucursales', 'Consulta de sucursales'),
+('sucursal.editar',     'Editar sucursal',     'sucursales', 'Modificación de datos de sucursal'),
+('sucursal.desactivar', 'Desactivar sucursal', 'sucursales', 'Baja lógica de sucursal'),
+('flotilla.registrar',    'Registrar flotilla',    'flotillas', 'Alta de flotillas'),
+('flotilla.consultar',    'Consultar flotilla',    'flotillas', 'Consulta de flotillas registradas'),
+('flotilla.editar',       'Editar flotilla',       'flotillas', 'Modificación de datos de flotilla'),
+('flotilla.desactivar',   'Desactivar flotilla',   'flotillas', 'Baja lógica de flotilla'),
+('flotilla.asignar_chofer','Asignar chofer a flotilla','flotillas','Vinculación de choferes a flotillas'),
+('unidad.registrar',   'Registrar unidad',   'unidades', 'Alta de unidades de transporte'),
+('unidad.consultar',   'Consultar unidad',   'unidades', 'Consulta de unidades registradas'),
+('unidad.editar',      'Editar unidad',      'unidades', 'Modificación de datos de unidad'),
+('unidad.desactivar',  'Desactivar unidad',  'unidades', 'Baja lógica de unidad'),
+('unidad.asignar_flotilla','Asignar unidad a flotilla','unidades','Vinculación de unidades a flotillas'),
+('ruta.planificar',        'Planificar ruta',            'rutas', 'Organización de itinerarios de entrega'),
+('ruta.asignar_recursos',  'Asignar recursos a ruta',    'rutas', 'Asignar chofer y unidad a una ruta'),
+('ruta.iniciar_recorrido', 'Iniciar recorrido',          'rutas', 'Inicio de la ejecución de una ruta'),
+('cambio_ruta.registrar',  'Notificar cambio de ruta',   'rutas', 'Registro manual de cambio de trayecto'),
+('cambio_ruta.consultar',  'Consultar cambios de ruta',  'rutas', 'Consulta de reportes de cambio de ruta'),
+('alerta.recibir',              'Recibir alertas de ruta',        'alertas', 'Recepción de notificaciones de ruta'),
+('alerta.consultar_historial',  'Consultar historial de alertas', 'alertas', 'Consulta de alertas registradas'),
+('mantenimiento.registrar',              'Registrar mantenimiento',              'mantenimiento', 'Alta de mantenimientos realizados'),
+('mantenimiento.consultar',              'Consultar mantenimiento',              'mantenimiento', 'Consulta de historial y próximo mantenimiento'),
+('tipo_mantenimiento.administrar',       'Administrar tipos de mantenimiento',   'mantenimiento', 'Alta y edición de tipos de mantenimiento'),
+('tipo_mantenimiento.consultar',         'Consultar tipos de mantenimiento',     'mantenimiento', 'Consulta del catálogo de tipos'),
+('alerta.mantenimiento_recibir',         'Recibir alertas de mantenimiento',     'mantenimiento', 'Recepción exclusiva de alertas por km'),
+('envio.registrar',          'Registrar envío',               'envios', 'Alta de envíos y generación de guía'),
+('envio.recepcion_sucursal', 'Registrar recepción en sucursal','envios', 'Confirmación física de un paquete'),
+('envio.cancelar',           'Cancelar envío',                'envios', 'Cancelación de un envío'),
+('envio.reprogramar',        'Reprogramar entrega',           'envios', 'Nueva fecha de entrega tras incidencia'),
+('envio.rastrear',           'Rastrear envío',                'envios', 'Consulta de estado y ubicación'),
+('envio.asignar_flotilla',   'Asignar envíos a flotilla',     'envios', 'Asignación de envíos recibidos a flotillas'),
+('envio.validar_entrega', 'Validar entrega', 'entregas', 'Cierre de entrega con código y evidencia'),
+('envio.devolucion_registrar',  'Registrar devolución',                'devoluciones', 'Documentación del retorno de un paquete'),
+('envio.devolucion_confirmar',  'Confirmar recepción de devolución',   'devoluciones', 'Recepción del paquete devuelto en sucursal'),
+('incidencia.reportar', 'Reportar incidencia', 'incidencias', 'Documentación de incidencias en campo'),
+('queja.registrar', 'Registrar queja', 'quejas', 'Alta de inconformidades'),
+('queja.atender',   'Atender queja',   'quejas', 'Seguimiento y cierre de quejas')
+ON CONFLICT (codigo) DO NOTHING;
+
+-- 2.4 ASIGNACIÓN DE PERMISOS POR ROL
+
+-- ROL: Jefe (RH + Seguridad + consulta de operación, envíos y mantenimiento)
+INSERT INTO rol_permiso (rol_id, permiso_id)
+SELECT r.id, p.id FROM rol r, permiso p
+WHERE r.nombre = 'Jefe'
+  AND p.codigo IN (
+    'cliente.registrar','cliente.consultar','cliente.editar','cliente.desactivar',
+    'empleado.registrar','empleado.consultar','empleado.editar','empleado.desactivar','empleado.cambiar_rol',
+    'empleado.suspender_acceso','empleado.desactivar_acceso','empleado.reactivar_acceso',
+    'puesto.administrar','puesto.consultar',
+    'sesion.iniciar','rol.administrar','rol.consultar','permiso.consultar','usuario.consultar','usuario.editar',
+    'sucursal.registrar','sucursal.consultar','sucursal.editar','sucursal.desactivar',
+    'flotilla.consultar','unidad.consultar','alerta.consultar_historial','cambio_ruta.consultar',
+    'envio.registrar','envio.rastrear','envio.cancelar','queja.atender',
+    'mantenimiento.consultar','tipo_mantenimiento.consultar'
+  )
+ON CONFLICT DO NOTHING;
+
+-- ROL: RH
+INSERT INTO rol_permiso (rol_id, permiso_id)
+SELECT r.id, p.id FROM rol r, permiso p
+WHERE r.nombre = 'RH'
+  AND p.codigo IN (
+    'cliente.registrar','cliente.consultar',
+    'empleado.registrar','empleado.consultar','empleado.editar','empleado.desactivar','empleado.cambiar_rol','empleado.suspender_acceso','empleado.desactivar_acceso','empleado.reactivar_acceso',
+    'puesto.administrar','puesto.consultar',
+    'sesion.iniciar','rol.administrar','rol.consultar','permiso.consultar','usuario.consultar','usuario.editar',
+    'sucursal.registrar','sucursal.consultar','sucursal.editar','sucursal.desactivar',
+    'flotilla.consultar','unidad.consultar',
+    'alerta.consultar_historial',
+    'mantenimiento.registrar','mantenimiento.consultar','tipo_mantenimiento.administrar','tipo_mantenimiento.consultar',
+    'cambio_ruta.consultar'
+  )
+ON CONFLICT DO NOTHING;
+
+-- ROL: Supervisor (Configura límites y Confirma mantenimientos)
+INSERT INTO rol_permiso (rol_id, permiso_id)
+SELECT r.id, p.id FROM rol r, permiso p
+WHERE r.nombre = 'Supervisor'
+  AND p.codigo IN (
+    'sesion.iniciar','sucursal.consultar','puesto.consultar',
+    'flotilla.registrar','flotilla.consultar','flotilla.editar','flotilla.desactivar','flotilla.asignar_chofer',
+    'unidad.registrar','unidad.consultar','unidad.editar','unidad.desactivar','unidad.asignar_flotilla',
+    'envio.rastrear','envio.asignar_flotilla',
+    'tipo_mantenimiento.administrar',
+    'tipo_mantenimiento.consultar',
+    'mantenimiento.registrar',
+    'mantenimiento.consultar',
+    'cliente.consultar','empleado.consultar','cambio_ruta.consultar'
+  )
+ON CONFLICT DO NOTHING;
+
+-- ROL: Jefe de flotilla (Recibe alertas y consulta, NO confirma)
+INSERT INTO rol_permiso (rol_id, permiso_id)
+SELECT r.id, p.id FROM rol r, permiso p
+WHERE r.nombre = 'Jefe de flotilla'
+  AND p.codigo IN (
+    'sesion.iniciar','sucursal.consultar','flotilla.consultar','unidad.consultar',
+    'envio.rastrear','ruta.planificar','ruta.asignar_recursos','cambio_ruta.consultar',
+    'alerta.recibir','alerta.consultar_historial',
+    'alerta.mantenimiento_recibir',
+    'mantenimiento.consultar',
+    'tipo_mantenimiento.consultar',
+    'cliente.consultar','empleado.consultar'
+  )
+ON CONFLICT DO NOTHING;
+
+-- ROL: Chofer
+INSERT INTO rol_permiso (rol_id, permiso_id)
+SELECT r.id, p.id FROM rol r, permiso p
+WHERE r.nombre = 'Chofer'
+  AND p.codigo IN (
+    'sesion.iniciar','ruta.iniciar_recorrido','cambio_ruta.registrar',
+    'envio.validar_entrega','envio.reprogramar','envio.devolucion_registrar',
+    'incidencia.reportar','cliente.consultar','unidad.consultar'
+  )
+ON CONFLICT DO NOTHING;
+
+-- ROL: Personal administrativo
+INSERT INTO rol_permiso (rol_id, permiso_id)
+SELECT r.id, p.id FROM rol r, permiso p
+WHERE r.nombre = 'Personal administrativo'
+  AND p.codigo IN (
+    'sesion.iniciar','sucursal.consultar',
+    'cliente.registrar','cliente.consultar','cliente.editar','cliente.desactivar',
+    'usuario.consultar','usuario.editar',
+    'envio.registrar','envio.rastrear','envio.reprogramar','envio.cancelar',
+    'queja.atender'
+  )
+ON CONFLICT DO NOTHING;
+
+-- ROL: Personal de sucursal
+INSERT INTO rol_permiso (rol_id, permiso_id)
+SELECT r.id, p.id FROM rol r, permiso p
+WHERE r.nombre = 'Personal de sucursal'
+  AND p.codigo IN (
+    'sesion.iniciar','sucursal.consultar','cliente.consultar',
+    'envio.recepcion_sucursal','envio.rastrear','envio.devolucion_registrar','envio.devolucion_confirmar'
+  )
+ON CONFLICT DO NOTHING;
+
+-- 2.5 TIPOS DE MANTENIMIENTO
+INSERT INTO tipo_mantenimiento (nombre, descripcion, km_intervalo, activo) VALUES
+('Cambio de aceite',       'Cambio de aceite y filtro',                    10000, TRUE),
+('Rotación de neumáticos', 'Rotación e inspección de neumáticos',            8000, TRUE),
+('Revisión de frenos',     'Inspección y ajuste del sistema de frenos',    20000, TRUE),
+('Cambio de filtros',      'Cambio de filtro de aire y combustible',       15000, TRUE),
+('Servicio mayor',         'Servicio mayor de mantenimiento',              50000, TRUE)
+ON CONFLICT (nombre) DO NOTHING;
+
+-- 2.6 SUCURSALES (CULIACÁN Y MAZATLÁN) Y SUS HORARIOS
+WITH dir_culiacan AS (
+  INSERT INTO direccion (
+    estado_id, municipio_id, localidad_id, asentamiento_id,
+    calle, numero_exterior, numero_interior, entre_calles,
+    colonia, localidad, municipio, estado, pais, codigo_postal,
+    referencias, latitud, longitud, activo
+  )
+  SELECT
+    (SELECT id FROM cat_estado WHERE cve_ent = '25' LIMIT 1),
+    (SELECT m.id FROM cat_municipio m JOIN cat_estado e ON e.id = m.estado_id WHERE e.cve_ent = '25' AND m.cve_mun = '006' LIMIT 1),
+    (SELECT l.id FROM cat_localidad l JOIN cat_municipio m ON m.id = l.municipio_id JOIN cat_estado e ON e.id = m.estado_id WHERE e.cve_ent = '25' AND m.cve_mun = '006' AND l.cve_loc = '0001' LIMIT 1),
+    (SELECT a.id FROM cat_asentamiento a WHERE a.d_codigo = '80000' LIMIT 1),
+    'Av. Álvaro Obregón', '450', NULL, 'Blvd. Francisco I. Madero y Calle Ángel Flores',
+    'Centro', 'Culiacán Rosales', 'Culiacán', 'Sinaloa', 'México', '80000',
+    'Frente a plazuela central, edificio corporativo con andén de carga', 24.8049100, -107.3940100, TRUE
+  WHERE NOT EXISTS (SELECT 1 FROM sucursal WHERE codigo = 'SUC-CUL-01')
+  RETURNING id
+),
+ins_suc_culiacan AS (
+  INSERT INTO sucursal (nombre, nombre_corto, codigo, direccion_id, telefono, email, cobertura, activo)
+  SELECT
+    'Sucursal Matriz Culiacán', 'Culiacán', 'SUC-CUL-01', dc.id,
+    '6677120000', 'culiacan@transportesrojas.com',
+    'Zona Centro de Sinaloa (Culiacán, Navolato, Elota, Cosalá, Badiraguato, Mocorito)', TRUE
+  FROM dir_culiacan dc
+  ON CONFLICT (codigo) DO NOTHING
+  RETURNING id
+),
+dir_mazatlan AS (
+  INSERT INTO direccion (
+    estado_id, municipio_id, localidad_id, asentamiento_id,
+    calle, numero_exterior, numero_interior, entre_calles,
+    colonia, localidad, municipio, estado, pais, codigo_postal,
+    referencias, latitud, longitud, activo
+  )
+  SELECT
+    (SELECT id FROM cat_estado WHERE cve_ent = '25' LIMIT 1),
+    (SELECT m.id FROM cat_municipio m JOIN cat_estado e ON e.id = m.estado_id WHERE e.cve_ent = '25' AND m.cve_mun = '012' LIMIT 1),
+    (SELECT l.id FROM cat_localidad l JOIN cat_municipio m ON m.id = l.municipio_id JOIN cat_estado e ON e.id = m.estado_id WHERE e.cve_ent = '25' AND m.cve_mun = '012' AND l.cve_loc = '0001' LIMIT 1),
+    (SELECT a.id FROM cat_asentamiento a WHERE a.d_codigo = '82000' LIMIT 1),
+    'Av. Ejército Mexicano', '1200', NULL, 'Calle Aquiles Serdán y Calle Benito Juárez',
+    'Centro', 'Mazatlán', 'Mazatlán', 'Sinaloa', 'México', '82000',
+    'Bodega logística zona portuaria con patio de maniobras', 23.2165200, -106.4163200, TRUE
+  WHERE NOT EXISTS (SELECT 1 FROM sucursal WHERE codigo = 'SUC-MAZ-01')
+  RETURNING id
+)
+INSERT INTO sucursal (nombre, nombre_corto, codigo, direccion_id, telefono, email, cobertura, activo)
+SELECT
+  'Sucursal Regional Mazatlán', 'Mazatlán', 'SUC-MAZ-01', dm.id,
+  '6699810000', 'mazatlan@transportesrojas.com',
+  'Zona Sur de Sinaloa (Mazatlán, Concordia, Rosario, Escuinapa, San Ignacio)', TRUE
+FROM dir_mazatlan dm
+ON CONFLICT (codigo) DO NOTHING;
+
+-- Horarios de operación de ambas sucursales (Lunes a Viernes 08:00-18:00, Sábado 09:00-14:00, Domingo descanso)
+INSERT INTO horario_sucursal (sucursal_id, dia_semana, hora_apertura, hora_cierre, es_dia_descanso)
+SELECT s.id, h.dia_semana, h.hora_apertura::TIME, h.hora_cierre::TIME, h.es_dia_descanso
+FROM sucursal s
+CROSS JOIN (
+  VALUES
+    (1, '08:00', '18:00', FALSE),
+    (2, '08:00', '18:00', FALSE),
+    (3, '08:00', '18:00', FALSE),
+    (4, '08:00', '18:00', FALSE),
+    (5, '08:00', '18:00', FALSE),
+    (6, '09:00', '14:00', FALSE),
+    (7, NULL,    NULL,    TRUE)
+) AS h(dia_semana, hora_apertura, hora_cierre, es_dia_descanso)
+WHERE s.codigo IN ('SUC-CUL-01', 'SUC-MAZ-01')
+  AND NOT EXISTS (
+    SELECT 1 FROM horario_sucursal hs
+    WHERE hs.sucursal_id = s.id AND hs.dia_semana = h.dia_semana
+  );
+
+-- 2.7 EMPLEADOS Y CUENTAS DE USUARIO
+-- Incluye:
+--   * 1 único Jefe General (Ricardo Rojas Medina)
+--   * Empleados para cada rol operativo por sucursal (Culiacán y Mazatlán)
+--   * Varios choferes (3 en Culiacán y 3 en Mazatlán)
+-- Contraseña inicial de todas las cuentas: DepR6670000000
+WITH cuentas (email, password_hash, rol, puesto, sucursal_codigo, nombre, ap_paterno, ap_materno, telefono) AS (
+  VALUES
+  -- JEFE GENERAL (Único en la empresa)
+  ('ricardo.rojas@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Jefe', 'Gerente General', 'SUC-CUL-01', 'Ricardo', 'Rojas', 'Medina', '6672450918'),
+
+  -- PERSONAL DE SUCURSAL MATRIZ CULIACÁN (Todos los roles + 3 Choferes)
+  ('rh.culiacan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'RH', 'Recursos Humanos', 'SUC-CUL-01', 'Ana Lucía', 'López', 'García', '6677100101'),
+  ('supervisor.culiacan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Supervisor', 'Supervisor', 'SUC-CUL-01', 'Héctor', 'Valenzuela', 'Montoya', '6677100102'),
+  ('flotilla.culiacan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Jefe de flotilla', 'Jefe de flotilla', 'SUC-CUL-01', 'Marco Antonio', 'Gaxiola', 'Leyva', '6677100103'),
+  ('admin.culiacan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Personal administrativo', 'Administrativo', 'SUC-CUL-01', 'Laura Elena', 'Cárdenas', 'Ibarra', '6677100104'),
+  ('sucursal.culiacan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Personal de sucursal', 'Personal de sucursal', 'SUC-CUL-01', 'Daniela Guadalupe', 'Osuna', 'Tirado', '6677100105'),
+  ('chofer1.culiacan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Chofer', 'Chofer', 'SUC-CUL-01', 'Carlos Alberto', 'Martínez', 'Pérez', '6677100106'),
+  ('chofer2.culiacan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Chofer', 'Chofer', 'SUC-CUL-01', 'Fernando', 'Sánchez', 'Ochoa', '6677100107'),
+  ('chofer3.culiacan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Chofer', 'Chofer', 'SUC-CUL-01', 'Luis Enrique', 'Bojórquez', 'Castro', '6677100108'),
+
+  -- PERSONAL DE SUCURSAL REGIONAL MAZATLÁN (Todos los roles + 3 Choferes)
+  ('rh.mazatlan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'RH', 'Recursos Humanos', 'SUC-MAZ-01', 'Marcela', 'Espinoza', 'Duarte', '6699100201'),
+  ('supervisor.mazatlan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Supervisor', 'Supervisor', 'SUC-MAZ-01', 'Roberto Carlos', 'Beltrán', 'Castro', '6699100202'),
+  ('flotilla.mazatlan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Jefe de flotilla', 'Jefe de flotilla', 'SUC-MAZ-01', 'Iván Salvador', 'Coronel', 'Vega', '6699100203'),
+  ('admin.mazatlan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Personal administrativo', 'Administrativo', 'SUC-MAZ-01', 'José Ramón', 'Medina', 'Félix', '6699100204'),
+  ('sucursal.mazatlan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Personal de sucursal', 'Personal de sucursal', 'SUC-MAZ-01', 'Brenda Lizeth', 'Murillo', 'Uriarte', '6699100205'),
+  ('chofer1.mazatlan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Chofer', 'Chofer', 'SUC-MAZ-01', 'Jesús Manuel', 'Lizárraga', 'Quintero', '6699100206'),
+  ('chofer2.mazatlan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Chofer', 'Chofer', 'SUC-MAZ-01', 'Miguel Ángel', 'Tirado', 'Osuna', '6699100207'),
+  ('chofer3.mazatlan@transportesrojas.com',
+   'AQAAAAEAAYagAAAAEBEiM0RVZneImaq7zN3u/wDoX76yeGT1WS/rd9U1GMRFvCY7R4u9ly6pswIBN2j8NQ==',
+   'Chofer', 'Chofer', 'SUC-MAZ-01', 'Diego Alejandro', 'Zazueta', 'Peraza', '6699100208')
+),
+nuevos_usuarios AS (
+  INSERT INTO usuario (email, password_hash, tipo_usuario, activo, ultimo_acceso)
+  SELECT c.email, c.password_hash, 'empleado', TRUE, NOW()
+  FROM cuentas c
+  WHERE NOT EXISTS (SELECT 1 FROM usuario u WHERE u.email = c.email)
+  RETURNING id, email
+),
+roles_asignados AS (
+  INSERT INTO usuario_rol (usuario_id, rol_id)
+  SELECT nu.id, r.id
+  FROM nuevos_usuarios nu
+  JOIN cuentas c ON c.email = nu.email
+  JOIN rol r     ON r.nombre = c.rol
+  ON CONFLICT DO NOTHING
+  RETURNING usuario_id
+),
+estados_usuarios AS (
+  INSERT INTO usuario_estado_historial (usuario_id, estado, motivo)
+  SELECT nu.id, 'activo', 'Alta inicial en el sistema'
+  FROM nuevos_usuarios nu
+  RETURNING usuario_id
+),
+nuevos_empleados AS (
+  INSERT INTO empleado (usuario_id, sucursal_id, nombre, apellido_paterno, apellido_materno, telefono, email, fecha_ingreso, activo)
+  SELECT nu.id, s.id, c.nombre, c.ap_paterno, c.ap_materno, c.telefono, c.email, (NOW() AT TIME ZONE 'America/Mazatlan')::date, TRUE
+  FROM nuevos_usuarios nu
+  JOIN cuentas c  ON c.email = nu.email
+  JOIN sucursal s ON s.codigo = c.sucursal_codigo
+  RETURNING id, email
+)
+INSERT INTO empleado_puesto_historial (empleado_id, puesto_id, fecha_inicio, motivo)
+SELECT ne.id, p.id, (NOW() AT TIME ZONE 'America/Mazatlan')::date, 'Alta inicial'
+FROM nuevos_empleados ne
+JOIN cuentas c ON c.email = ne.email
+JOIN puesto p  ON p.nombre = c.puesto;
+
+-- Asignar a los Supervisores como responsables operativos de cada sucursal
+UPDATE sucursal
+SET responsable_id = (SELECT id FROM empleado WHERE email = 'supervisor.culiacan@transportesrojas.com' LIMIT 1)
+WHERE codigo = 'SUC-CUL-01';
+
+UPDATE sucursal
+SET responsable_id = (SELECT id FROM empleado WHERE email = 'supervisor.mazatlan@transportesrojas.com' LIMIT 1)
+WHERE codigo = 'SUC-MAZ-01';
+
+-- 2.8 FLOTILLAS, UNIDADES Y ASIGNACIÓN DE CHOFERES
+INSERT INTO flotilla (sucursal_id, supervisor_id, nombre, codigo, activo)
+SELECT s.id, e.id, f.nombre, f.codigo, TRUE
+FROM (
+  VALUES
+    ('SUC-CUL-01', 'flotilla.culiacan@transportesrojas.com', 'Flotilla Urbana Culiacán',    'FL-CUL-01'),
+    ('SUC-CUL-01', 'flotilla.culiacan@transportesrojas.com', 'Flotilla Regional Culiacán',  'FL-CUL-02'),
+    ('SUC-MAZ-01', 'flotilla.mazatlan@transportesrojas.com', 'Flotilla Urbana Mazatlán',    'FL-MAZ-01'),
+    ('SUC-MAZ-01', 'flotilla.mazatlan@transportesrojas.com', 'Flotilla Regional Mazatlán',  'FL-MAZ-02')
+) AS f(sucursal_codigo, supervisor_email, nombre, codigo)
+JOIN sucursal s ON s.codigo = f.sucursal_codigo
+JOIN empleado e ON e.email = f.supervisor_email
+ON CONFLICT (codigo) DO NOTHING;
+
+INSERT INTO unidad (flotilla_id, placas, tipo_vehiculo, marca, modelo, anio, capacidad_kg, km_odometro_inicial, km_odometro_actual, estado, activo)
+SELECT fl.id, u.placas, u.tipo_vehiculo, u.marca, u.modelo, u.anio, u.capacidad_kg, u.km_inicial, u.km_actual, u.estado, TRUE
+FROM (
+  VALUES
+    -- Unidades de Sucursal Culiacán
+    ('FL-CUL-01', 'SIN-101-A', 'Van de Reparto',  'Mercedes-Benz', 'Sprinter 315',  2023, 1500.00, 12000, 18450, 'disponible'),
+    ('FL-CUL-01', 'SIN-102-A', 'Van de Reparto',  'Ford',          'Transit Cargo', 2024, 1400.00,  5000, 11200, 'disponible'),
+    ('FL-CUL-02', 'SIN-103-B', 'Camioneta 3.5T',  'Isuzu',         'ELF 400',       2022, 3500.00, 28000, 36900, 'disponible'),
+    ('FL-CUL-02', 'SIN-104-B', 'Camión Rabón',    'Freightliner',  'M2 106',        2023, 8000.00, 15000, 24100, 'disponible'),
+    -- Unidades de Sucursal Mazatlán
+    ('FL-MAZ-01', 'SIN-201-A', 'Van de Reparto',  'Nissan',        'NV350 Urvan',   2023, 1350.00, 10000, 16800, 'disponible'),
+    ('FL-MAZ-01', 'SIN-202-A', 'Van de Reparto',  'RAM',           'ProMaster 2500',2024, 1600.00,  4000,  9300, 'disponible'),
+    ('FL-MAZ-02', 'SIN-203-B', 'Camioneta 3.5T',  'Hino',          'Serie 300',     2022, 3500.00, 31000, 40200, 'disponible'),
+    ('FL-MAZ-02', 'SIN-204-B', 'Camión Rabón',    'Kenworth',      'KW45',          2023, 7500.00, 18000, 26500, 'disponible')
+) AS u(flotilla_codigo, placas, tipo_vehiculo, marca, modelo, anio, capacidad_kg, km_inicial, km_actual, estado)
+JOIN flotilla fl ON fl.codigo = u.flotilla_codigo
+ON CONFLICT (placas) DO NOTHING;
+
+-- Asignación de los choferes de Culiacán y Mazatlán a sus flotillas correspondientes
+INSERT INTO asignacion_flotilla_chofer (flotilla_id, chofer_id, fecha_inicio, activo)
+SELECT fl.id, e.id, (NOW() AT TIME ZONE 'America/Mazatlan')::date, TRUE
+FROM (
+  VALUES
+    ('FL-CUL-01', 'chofer1.culiacan@transportesrojas.com'),
+    ('FL-CUL-01', 'chofer2.culiacan@transportesrojas.com'),
+    ('FL-CUL-02', 'chofer3.culiacan@transportesrojas.com'),
+    ('FL-MAZ-01', 'chofer1.mazatlan@transportesrojas.com'),
+    ('FL-MAZ-01', 'chofer2.mazatlan@transportesrojas.com'),
+    ('FL-MAZ-02', 'chofer3.mazatlan@transportesrojas.com')
+) AS a(flotilla_codigo, chofer_email)
+JOIN flotilla fl ON fl.codigo = a.flotilla_codigo
+JOIN empleado e  ON e.email = a.chofer_email
+WHERE NOT EXISTS (
+  SELECT 1 FROM asignacion_flotilla_chofer afc
+  WHERE afc.chofer_id = e.id AND afc.activo = TRUE
+);
+
+
+-- 2.9 SINCRONIZACIÓN CON HISTORIAL DE MIGRACIONES DE EF CORE
+-- Evita que 'dotnet ef database update' intente recrear tablas que ya fueron creadas con este script SQL
+CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+    "MigrationId" character varying(150) NOT NULL PRIMARY KEY,
+    "ProductVersion" character varying(32) NOT NULL
+);
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion") VALUES
+('20260925013059_InitialCreate',         '10.0.12'),
+('20261105024000_CatalogosInegiSepomex', '10.0.12')
+ON CONFLICT ("MigrationId") DO NOTHING;

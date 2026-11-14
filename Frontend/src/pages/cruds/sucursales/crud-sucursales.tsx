@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Pencil,
   Trash2,
@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import "../estilos/cruds.css";
 import { fetchApi } from "../../../services/api";
+import { useToast } from "../../../components/Toast";
+import { extraerMensajeErrorApi } from "../../../utils/errorMessages";
+import { hasPermissionOrRole } from "../../../utils/auth";
+import { limpiarSoloDigitos } from "../../../utils/inputValidation";
 import {
   type Sucursal,
   type FormData,
@@ -30,8 +34,9 @@ import {
 
 function exportarExcel(datos: Sucursal[]) {
   const cols = [
-    "ID",
+    "Clave",
     "Nombre",
+    "Alias",
     "Calle",
     "Municipio",
     "Estado",
@@ -39,8 +44,9 @@ function exportarExcel(datos: Sucursal[]) {
     "Telefono",
   ];
   const rows = datos.map((s) => [
-    s.id,
+    s.codigo || `#${s.id}`,
     s.nombre,
+    s.nombreCorto ?? "",
     s.calle ?? "",
     s.municipio ?? "",
     s.estado ?? "",
@@ -60,20 +66,27 @@ function exportarExcel(datos: Sucursal[]) {
 }
 
 export default function CrudSucursales() {
+  const { toast } = useToast();
   const [items, setItems] = useState<Sucursal[]>([]);
   const [, setLoading] = useState(false);
 
   const cargarDatos = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await fetchApi("/Sucursal");
-      setItems(data);
+      let data: any;
+      try {
+        data = await fetchApi("/Sucursal");
+      } catch {
+        data = await fetchApi("/CatalogoGeografico/sucursales-operativas");
+      }
+      setItems(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Error", error);
+      console.error("Error al cargar sucursales", error);
+      toast.error("Error al cargar las sucursales");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     cargarDatos();
@@ -82,6 +95,7 @@ export default function CrudSucursales() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [filters, setFilters] = useState<Filters>(FILTERS_VACIO);
+  const [busquedaGlobal, setBusquedaGlobal] = useState("");
   const [sortCol, setSortCol] = useState<SortCol>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -94,7 +108,9 @@ export default function CrudSucursales() {
 
   const COLS: (keyof Sucursal)[] = [
     "id",
+    "codigo",
     "nombre",
+    "nombreCorto",
     "calle",
     "municipio",
     "estado",
@@ -103,7 +119,15 @@ export default function CrudSucursales() {
   ];
 
   const filtered = items.filter((s) => {
-    const m = (v: string | number | null, f: string) =>
+    if (busquedaGlobal.trim()) {
+      const q = busquedaGlobal.toLowerCase();
+      const matchGlobal = COLS.some((col) =>
+        String(s[col] ?? "").toLowerCase().includes(q)
+      );
+      if (!matchGlobal) return false;
+    }
+
+    const m = (v: string | number | null | undefined, f: string) =>
       !f ||
       String(v ?? "")
         .toLowerCase()
@@ -128,6 +152,7 @@ export default function CrudSucursales() {
       if (e.key === "Escape") {
         setModalAbierto(false);
         setConfirmando(null);
+        setConfirmInput("");
       }
     };
     document.addEventListener("keydown", h);
@@ -164,6 +189,8 @@ export default function CrudSucursales() {
     setEditando(s);
     setForm({
       nombre: s.nombre,
+      nombreCorto: s.nombreCorto ?? "",
+      codigo: s.codigo ?? "",
       calle: s.calle ?? "",
       municipio: s.municipio ?? "",
       estado: s.estado ?? "",
@@ -174,6 +201,7 @@ export default function CrudSucursales() {
   }, []);
 
   const guardar = useCallback(async () => {
+    if (guardando) return;
     setGuardando(true);
     try {
       if (editando) {
@@ -181,21 +209,28 @@ export default function CrudSucursales() {
           method: 'PUT',
           body: JSON.stringify(form)
         });
-        setItems((prev) => prev.map((s) => (s.id === editando.id ? actualizado : s)));
+        setItems((prev) =>
+          prev.map((s) =>
+            s.id === editando.id ? (actualizado ?? { ...s, ...form, id: editando.id }) : s
+          )
+        );
+        toast.success(`Sucursal "${form.nombre}" actualizada con éxito.`);
       } else {
         const nuevo = await fetchApi('/Sucursal', {
           method: 'POST',
           body: JSON.stringify(form)
         });
         setItems((prev) => [...prev, nuevo]);
+        toast.success(`Sucursal "${form.nombre}" creada correctamente.`);
       }
       setModalAbierto(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al guardar", error);
+      toast.error(extraerMensajeErrorApi(error, "Error al procesar la sucursal."));
     } finally {
       setGuardando(false);
     }
-  }, [editando, form]);
+  }, [editando, form, guardando, toast]);
 
   const abrirConfirmar = useCallback((s: Sucursal) => {
     setConfirmInput("");
@@ -203,55 +238,122 @@ export default function CrudSucursales() {
   }, []);
 
   const eliminar = useCallback(async () => {
-    if (!confirmando) return;
+    if (!confirmando || eliminando) return;
     setEliminando(true);
     try {
       await fetchApi(`/Sucursal/${confirmando.id}`, { method: 'DELETE' });
       setItems((prev) => prev.filter((s) => s.id !== confirmando.id));
+      toast.info(`Sucursal "${confirmando.nombre}" eliminada correctamente.`);
       setConfirmando(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al eliminar", error);
+      toast.error(extraerMensajeErrorApi(error, "Error al eliminar la sucursal."));
     } finally {
       setEliminando(false);
     }
-  }, [confirmando]);
+  }, [confirmando, eliminando, toast]);
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    const valorNormalizado =
+      name === "telefono"
+        ? limpiarSoloDigitos(value, 10)
+        : name === "codigoPostal"
+          ? limpiarSoloDigitos(value, 5)
+          : value;
+    setForm((prev) => ({ ...prev, [name]: valorNormalizado }));
+  };
 
   const columns: ColumnDef<Sucursal>[] = [
-    { key: "id", label: "ID" },
+    {
+      key: "codigo",
+      label: "Clave",
+      render: (s) => (
+        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+          {s.codigo || `#${s.id}`}
+        </span>
+      ),
+    },
     { key: "nombre", label: "Nombre" },
+    {
+      key: "nombreCorto",
+      label: "Alias",
+      render: (s) => (
+        <span className="font-medium text-slate-700">
+          {s.nombreCorto || <span className="text-slate-400 italic">Sin alias</span>}
+        </span>
+      ),
+    },
     { key: "calle", label: "Calle", render: (s) => s.calle ?? "-" },
     { key: "municipio", label: "Municipio", render: (s) => s.municipio ?? "-" },
     { key: "estado", label: "Estado", render: (s) => s.estado ?? "-" },
     { key: "codigoPostal", label: "C.P.", render: (s) => s.codigoPostal ?? "-" },
-    { key: "telefono", label: "Telefono", render: (s) => s.telefono ?? "-" },
+    { key: "telefono", label: "Teléfono", render: (s) => s.telefono ?? "-" },
   ];
+
+  const opcionesEstados = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((s) => {
+      if (s.estado) set.add(s.estado);
+    });
+    return Array.from(set).sort();
+  }, [items]);
+
+  const opcionesMunicipios = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((s) => {
+      if (s.municipio) set.add(s.municipio);
+    });
+    return Array.from(set).sort();
+  }, [items]);
 
   const filterDefs: FilterDef[] = [
-    { key: "id", type: "text", placeholder: "Filtrar..." },
-    { key: "nombre", type: "text", placeholder: "Filtrar..." },
-    { key: "calle", type: "text", placeholder: "Filtrar..." },
-    { key: "municipio", type: "text", placeholder: "Filtrar..." },
-    { key: "estado", type: "text", placeholder: "Filtrar..." },
-    { key: "codigoPostal", type: "text", placeholder: "Filtrar..." },
-    { key: "telefono", type: "text", placeholder: "Filtrar..." },
+    {
+      key: "estado",
+      label: "Estado / Entidad",
+      type: "select",
+      options: [
+        { value: "", label: "Todos los estados" },
+        ...opcionesEstados.map((e: string) => ({ value: e, label: e })),
+      ],
+    },
+    {
+      key: "municipio",
+      label: "Municipio / Ciudad",
+      type: "select",
+      options: [
+        { value: "", label: "Todos los municipios" },
+        ...opcionesMunicipios.map((m: string) => ({ value: m, label: m })),
+      ],
+    },
   ];
 
+  const rolesAdminSucursal = ["RH", "Jefe"];
+  const puedeCrear = hasPermissionOrRole("sucursal.registrar", rolesAdminSucursal);
+  const puedeEditar = hasPermissionOrRole("sucursal.editar", rolesAdminSucursal);
+  const puedeEliminar = hasPermissionOrRole("sucursal.desactivar", rolesAdminSucursal);
+
   const actions: ActionDef<Sucursal>[] = [
-    {
-      label: "Editar",
-      icon: <Pencil size={14} />,
-      className: "cc-dropdown-item--edit",
-      onClick: abrirEditar,
-    },
-    {
-      label: "Eliminar",
-      icon: <Trash2 size={14} />,
-      className: "cc-dropdown-item--delete",
-      onClick: abrirConfirmar,
-    },
+    ...(puedeEditar
+      ? [
+        {
+          label: "Editar",
+          icon: <Pencil size={14} />,
+          className: "cc-dropdown-item--edit",
+          onClick: abrirEditar,
+        },
+      ]
+      : []),
+    ...(puedeEliminar
+      ? [
+        {
+          label: "Eliminar",
+          icon: <Trash2 size={14} />,
+          className: "cc-dropdown-item--delete",
+          onClick: abrirConfirmar,
+        },
+      ]
+      : []),
   ];
 
   return (
@@ -259,18 +361,17 @@ export default function CrudSucursales() {
       <div className="cc-header">
         <div className="cc-title-group">
           <h1 className="cc-title">Sucursales</h1>
-          <span className="cc-badge">
-            {filtered.length} de {items.length}
-          </span>
         </div>
-        <button
-          id="btn-agregar-sucursal"
-          className="cc-btn-add"
-          onClick={abrirAgregar}
-        >
-          <Plus size={17} strokeWidth={2.5} />
-          <span>Nueva sucursal</span>
-        </button>
+        {puedeCrear && (
+          <button
+            id="btn-agregar-sucursal"
+            className="cc-btn-add"
+            onClick={abrirAgregar}
+          >
+            <Plus size={17} strokeWidth={2.5} />
+            <span>Nueva sucursal</span>
+          </button>
+        )}
       </div>
 
       <TablaGenerica<Sucursal>
@@ -284,6 +385,17 @@ export default function CrudSucursales() {
         onFilterChange={onFilterChange}
         actions={actions}
         idAccessor={(s) => s.id}
+        busquedaGlobal={busquedaGlobal}
+        onBusquedaGlobalChange={(val) => {
+          setBusquedaGlobal(val);
+          setPage(0);
+        }}
+        onLimpiarFiltros={() => {
+          setFilters(FILTERS_VACIO);
+          setBusquedaGlobal("");
+          setPage(0);
+        }}
+        placeholderGlobal="Buscar sucursales por clave, nombre, alias, municipio..."
       />
 
       <div className="cc-footer-bar">
@@ -315,7 +427,7 @@ export default function CrudSucursales() {
               </option>
             ))}
           </select>
-          <span className="cc-pagesize-label">por pagina</span>
+          <span className="cc-pagesize-label">por página</span>
         </div>
         <div className="cc-pagination">
           <button
@@ -358,6 +470,7 @@ export default function CrudSucursales() {
           guardar();
         }}
         onChange={onChange}
+        onSetForm={setForm}
         form={form}
         editando={editando}
         guardando={guardando}

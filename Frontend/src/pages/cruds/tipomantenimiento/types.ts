@@ -39,9 +39,9 @@ export const FILTERS_VACIO: Filters = {
 
 export const OPCIONES_PAGINA = [10, 25, 50, 100] as const;
 export const TIPOS_VEH = [
-  "Camion",
+  "Camión",
   "Camioneta",
-  "Sedan",
+  "Sedán",
   "SUV",
   "Motocicleta",
   "Todos",

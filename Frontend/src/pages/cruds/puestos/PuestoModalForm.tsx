@@ -57,14 +57,14 @@ export function PuestoModalForm({
               />
             </div>
             <div className="cc-field cc-field--wide">
-              <label htmlFor="fp-desc">Descripcion</label>
+              <label htmlFor="fp-desc">Descripción</label>
               <input
                 id="fp-desc"
                 name="descripcion"
                 type="text"
                 value={form.descripcion ?? ""}
                 onChange={onChange}
-                placeholder="Descripcion opcional"
+                placeholder="Descripción opcional"
               />
             </div>
           </div>

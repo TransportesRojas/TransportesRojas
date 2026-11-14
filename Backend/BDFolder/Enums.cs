@@ -1,4 +1,4 @@
-﻿namespace Backend.BDFolder;
+namespace Backend.BDFolder;
 
 public enum TipoUsuario { Empleado, Cliente, Sistema }
 
@@ -21,8 +21,6 @@ public enum EstadoEnvio
     Entregado, NoEntregado, EnDevolucion, Devuelto,
     Cancelado, Reprogramado
 }
-
-public enum EstadoCitaRecoleccion { Solicitada, Confirmada, Reprogramada, Atendida, Cancelada }
 
 public enum EstadoRuta { Planeada, EnCurso, Finalizada, Cancelada }
 
@@ -51,3 +49,18 @@ public enum EstadoIncidencia { Abierta, EnRevision, Resuelta, Cerrada }
 public enum EstadoReprogramacion { Programada, Confirmada, Cancelada, Atendida }
 
 public enum EstadoQueja { Abierta, EnAtencion, Resuelta, Cerrada }
+
+public enum EstadoAvisoSms
+{
+    Pendiente,
+    AceptadoProveedor,
+    PendienteConfirmacion,
+    PendienteReintento,
+    PendienteCorreccion
+}
+
+public enum EstadoAvisoCambioRuta
+{
+    Pendiente,
+    Enviado
+}

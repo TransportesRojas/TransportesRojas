@@ -18,7 +18,15 @@ public record ActualizarUnidadModel(
     string? Marca,
     string? Modelo,
     int? Anio,
-    decimal CapacidadKg
+    decimal CapacidadKg,
+    decimal? KmOdometroActual = null,
+    string? Estado = null,
+    bool? Activo = null
+);
+
+public record RegistrarOdometroCierreModel(
+    decimal KmOdometroFinal,
+    string? Observaciones = null
 );
 
 public record UnidadResponse(
@@ -33,5 +41,6 @@ public record UnidadResponse(
     decimal? KmOdometroInicial,
     decimal KmOdometroActual,
     string Estado,
-    bool Activo
+    bool Activo,
+    string? FlotillaNombre = null
 );

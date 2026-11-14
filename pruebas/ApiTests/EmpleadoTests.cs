@@ -49,20 +49,16 @@ public class EmpleadoTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task TC_EMP_001_GetEmpleados_WithAuth_ReturnsOk()
     {
-        // Arrange
         _client.DefaultRequestHeaders.Add("X-Test-Role", "RH");
 
-        // Act
         var response = await _client.GetAsync("/api/Empleado");
 
-        // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
     public async Task TC_EMP_002_CreateEmpleado_ReturnsCreated()
     {
-        // Arrange
         _client.DefaultRequestHeaders.Add("X-Test-Role", "RH");
         var empleadoEmail = $"emp_{Guid.NewGuid().ToString().Substring(0, 8)}@test.com";
         var payload = new { 
@@ -73,10 +69,8 @@ public class EmpleadoTests : IClassFixture<WebApplicationFactory<Program>>
             rolId = 1
         };
 
-        // Act
         var response = await _client.PostAsJsonAsync("/api/Empleado", payload);
 
-        // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 }

@@ -1,29 +1,28 @@
 import { useState, type SubmitEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import logoTransportesRojas from "../../../assets/LogoCompleto.webp";
-
-
-
-
-
-
-/* unused TIEMPO_VERIFICACION */
-
+import { ApiError, fetchApi } from "../../../services/api";
+import { extraerMensajeErrorApi } from "../../../utils/errorMessages";
 
 const COLOR_ROJO = "#D64545";
 const COLOR_VERDE = "#16A34A";
 
-
-
-
-/* unused function verificarCredenciales removed */
-
-
-
-import { useNavigate } from "react-router-dom";
-import { fetchApi } from "../../../services/api";
-
 function getRedirectPath(roles: string[]): string {
   if (!roles || roles.length === 0) return "/login-empleados";
+  const rolesNorm = roles.map((r) => r.toLowerCase());
+  const tieneRolAdmin = rolesNorm.some((r) =>
+    [
+      "rh",
+      "supervisor",
+      "jefe de flotilla",
+      "jefe",
+      "personal administrativo",
+      "personal de sucursal",
+    ].includes(r)
+  );
+  if (rolesNorm.includes("chofer") && !tieneRolAdmin) {
+    return "/chofer";
+  }
   return "/admin/bienvenida";
 }
 
@@ -39,11 +38,10 @@ export default function LoginEmpleados() {
   const [cargando, setCargando] = useState(false);
   const [mensajeError, setMensajeError] = useState("");
 
-
   async function manejarEnvio(evento: SubmitEvent<HTMLFormElement> | React.FormEvent) {
     evento.preventDefault();
+    if (cargando) return;
     setMensajeError("");
-
 
     if (!numeroEmpleado.trim() || !contrasena.trim()) {
       setMensajeError("Ingresa tus credenciales para continuar.");
@@ -52,7 +50,6 @@ export default function LoginEmpleados() {
 
     setCargando(true);
     try {
-
       const idStr = numeroEmpleado.replace(/\D/g, "");
       const empleadoId = parseInt(idStr, 10);
 
@@ -60,19 +57,20 @@ export default function LoginEmpleados() {
         method: "POST",
         body: JSON.stringify({
           empleadoId: isNaN(empleadoId) ? 0 : empleadoId,
-          password: contrasena
+          password: contrasena,
         }),
       });
 
       if (resp) {
         if (!resp.roles || resp.roles.length === 0) {
-          setMensajeError("Tu usuario no tiene ningún rol asignado. Contacta a RH para que te asignen uno.");
+          setMensajeError(
+            "Tu usuario no tiene ningún rol asignado. Contacta a RH para que te asignen uno."
+          );
           return;
         }
 
         localStorage.setItem("token", resp.token);
         localStorage.setItem("user", JSON.stringify(resp));
-
 
         const ruta = getRedirectPath(resp.roles);
         navigate(ruta);
@@ -81,10 +79,15 @@ export default function LoginEmpleados() {
       }
     } catch (error: any) {
       console.error(error);
-      if (error.message && error.message.includes("401")) {
+      if (error instanceof ApiError && error.status === 401) {
         setMensajeError("Credenciales incorrectas. Revisa tu número de empleado y contraseña.");
       } else {
-        setMensajeError(error.message || "Error al iniciar sesión. Verifica tus datos o intenta más tarde.");
+        setMensajeError(
+          extraerMensajeErrorApi(
+            error,
+            "Error al iniciar sesión. Verifica tus datos o intenta más tarde."
+          )
+        );
       }
     } finally {
       setCargando(false);
@@ -222,6 +225,16 @@ export default function LoginEmpleados() {
               sistemas@transportesrojas.mx
             </a>
           </p>
+
+          <div className="mt-3">
+            <Link
+              to="/login-clientes"
+              id="link-portal-clientes"
+              className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#0B2D4A] no-underline transition-colors hover:text-[#D64545] hover:underline"
+            >
+              ¿Eres cliente? Ir al Portal de Clientes →
+            </Link>
+          </div>
 
 
         </div>

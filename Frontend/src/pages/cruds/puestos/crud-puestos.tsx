@@ -9,6 +9,9 @@ import {
 } from "lucide-react";
 import "../estilos/cruds.css";
 import { fetchApi } from "../../../services/api";
+import { useToast } from "../../../components/Toast";
+import { extraerMensajeErrorApi } from "../../../utils/errorMessages";
+import { hasPermissionOrRole } from "../../../utils/auth";
 import {
   type Puesto,
   type FormData,
@@ -29,8 +32,8 @@ import {
 } from "../../../components/TablaGenerica";
 
 function exportarExcel(datos: Puesto[]) {
-  const cols = ["ID", "Nombre", "Descripcion"];
-  const rows = datos.map((p) => [p.id, p.nombre, p.descripcion ?? ""]);
+  const cols = ["#", "Nombre", "Descripción"];
+  const rows = datos.map((p) => [`#${p.id}`, p.nombre, p.descripcion ?? ""]);
   const csv = [cols, ...rows]
     .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
     .join("\r\n");
@@ -44,6 +47,7 @@ function exportarExcel(datos: Puesto[]) {
 }
 
 export default function CrudPuestos() {
+  const { toast } = useToast();
   const [items, setItems] = useState<Puesto[]>([]);
   const [, setLoading] = useState(false);
 
@@ -53,11 +57,12 @@ export default function CrudPuestos() {
       const data = await fetchApi("/Puesto");
       setItems(data);
     } catch (error) {
-      console.error("Error", error);
+      console.error("Error al cargar puestos", error);
+      toast.error("Error al cargar los puestos laborales.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     cargarDatos();
@@ -66,6 +71,7 @@ export default function CrudPuestos() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [filters, setFilters] = useState<Filters>(FILTERS_VACIO);
+  const [busquedaGlobal, setBusquedaGlobal] = useState("");
   const [sortCol, setSortCol] = useState<SortCol>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -77,6 +83,14 @@ export default function CrudPuestos() {
   const [eliminando, setEliminando] = useState(false);
 
   const filtered = items.filter((p) => {
+    if (busquedaGlobal.trim()) {
+      const q = busquedaGlobal.toLowerCase();
+      const match = [p.id, p.nombre, p.descripcion].some((val) =>
+        String(val ?? "").toLowerCase().includes(q)
+      );
+      if (!match) return false;
+    }
+
     const m = (v: string | number | null, f: string) =>
       !f ||
       String(v ?? "")
@@ -140,11 +154,15 @@ export default function CrudPuestos() {
 
   const abrirEditar = useCallback((p: Puesto) => {
     setEditando(p);
-    setForm({ nombre: p.nombre, descripcion: p.descripcion ?? "" });
+    setForm({
+      nombre: p.nombre,
+      descripcion: p.descripcion ?? "",
+    });
     setModalAbierto(true);
   }, []);
 
   const guardar = useCallback(async () => {
+    if (guardando) return;
     setGuardando(true);
     try {
       if (editando) {
@@ -153,20 +171,23 @@ export default function CrudPuestos() {
           body: JSON.stringify(form)
         });
         setItems((prev) => prev.map((p) => (p.id === editando.id ? actualizado : p)));
+        toast.success(`Puesto "${form.nombre}" actualizado.`);
       } else {
         const nuevo = await fetchApi('/Puesto', {
           method: 'POST',
           body: JSON.stringify(form)
         });
         setItems((prev) => [...prev, nuevo]);
+        toast.success(`Puesto "${form.nombre}" creado con éxito.`);
       }
       setModalAbierto(false);
-    } catch (error) {
-      console.error("Error al guardar", error);
+    } catch (error: any) {
+      console.error("Error al guardar puesto", error);
+      toast.error(extraerMensajeErrorApi(error, "Error al procesar el puesto."));
     } finally {
       setGuardando(false);
     }
-  }, [editando, form]);
+  }, [editando, form, guardando, toast]);
 
   const abrirConfirmar = useCallback((p: Puesto) => {
     setConfirmInput("");
@@ -174,66 +195,93 @@ export default function CrudPuestos() {
   }, []);
 
   const eliminar = useCallback(async () => {
-    if (!confirmando) return;
+    if (!confirmando || eliminando) return;
     setEliminando(true);
     try {
       await fetchApi(`/Puesto/${confirmando.id}`, { method: 'DELETE' });
       setItems((prev) => prev.filter((p) => p.id !== confirmando.id));
+      toast.info(`Puesto "${confirmando.nombre}" eliminado.`);
       setConfirmando(null);
-    } catch (error) {
-      console.error("Error al eliminar", error);
+    } catch (error: any) {
+      console.error("Error al eliminar puesto", error);
+      toast.error(extraerMensajeErrorApi(error, "Error al eliminar el puesto."));
     } finally {
       setEliminando(false);
     }
-  }, [confirmando]);
+  }, [confirmando, eliminando, toast]);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
   const columns: ColumnDef<Puesto>[] = [
-    { key: "id", label: "ID" },
-    { key: "nombre", label: "Nombre" },
-    { key: "descripcion", label: "Descripcion", render: (p) => p.descripcion ?? "-" },
+    {
+      key: "nombre",
+      label: "Puesto",
+      render: (p) => <span className="font-bold text-slate-800 text-xs">{p.nombre}</span>,
+    },
+    {
+      key: "descripcion",
+      label: "Descripción",
+      render: (p) => p.descripcion || <span className="text-slate-400 italic">Sin descripción</span>,
+    },
   ];
 
   const filterDefs: FilterDef[] = [
-    { key: "id", type: "text", placeholder: "Filtrar" },
-    { key: "nombre", type: "text", placeholder: "Filtrar" },
-    { key: "descripcion", type: "text", placeholder: "Filtrar" },
+    {
+      key: "nombre",
+      label: "Puesto",
+      type: "select",
+      options: [
+        { value: "", label: "Todos los puestos" },
+        ...items.map((p) => ({ value: p.nombre, label: p.nombre })),
+      ],
+    },
   ];
 
+  const rolesAdminPuesto = ["RH", "Jefe"];
+  const puedeCrear = hasPermissionOrRole("puesto.administrar", rolesAdminPuesto);
+  const puedeEditar = hasPermissionOrRole("puesto.administrar", rolesAdminPuesto);
+  const puedeEliminar = hasPermissionOrRole("puesto.administrar", rolesAdminPuesto);
+
   const actions: ActionDef<Puesto>[] = [
-    {
-      label: "Editar",
-      icon: <Pencil size={14} />,
-      className: "cc-dropdown-item--edit",
-      onClick: abrirEditar,
-    },
-    {
-      label: "Eliminar",
-      icon: <Trash2 size={14} />,
-      className: "cc-dropdown-item--delete",
-      onClick: abrirConfirmar,
-    },
+    ...(puedeEditar
+      ? [
+          {
+            label: "Editar",
+            icon: <Pencil size={14} />,
+            className: "cc-dropdown-item--edit",
+            onClick: abrirEditar,
+          },
+        ]
+      : []),
+    ...(puedeEliminar
+      ? [
+          {
+            label: "Eliminar",
+            icon: <Trash2 size={14} />,
+            className: "cc-dropdown-item--delete",
+            onClick: abrirConfirmar,
+          },
+        ]
+      : []),
   ];
 
   return (
     <div className="cc-page">
       <div className="cc-header">
         <div className="cc-title-group">
-          <h1 className="cc-title">Puestos</h1>
-          <span className="cc-badge">
-            {filtered.length} de {items.length}
-          </span>
+          <h1 className="cc-title">Puestos de Trabajo</h1>
         </div>
-        <button
-          id="btn-agregar-puesto"
-          className="cc-btn-add"
-          onClick={abrirAgregar}
-        >
-          <Plus size={17} strokeWidth={2.5} />
-          <span>Nuevo puesto</span>
-        </button>
+        {puedeCrear && (
+          <button
+            id="btn-agregar-puesto"
+            className="cc-btn-add"
+            onClick={abrirAgregar}
+          >
+            <Plus size={17} strokeWidth={2.5} />
+            <span>Nuevo puesto</span>
+          </button>
+        )}
       </div>
 
       <TablaGenerica<Puesto>
@@ -247,6 +295,17 @@ export default function CrudPuestos() {
         onFilterChange={onFilterChange}
         actions={actions}
         idAccessor={(p) => p.id}
+        busquedaGlobal={busquedaGlobal}
+        onBusquedaGlobalChange={(val) => {
+          setBusquedaGlobal(val);
+          setPage(0);
+        }}
+        onLimpiarFiltros={() => {
+          setFilters(FILTERS_VACIO);
+          setBusquedaGlobal("");
+          setPage(0);
+        }}
+        placeholderGlobal="Buscar puestos laborales..."
       />
 
       <div className="cc-footer-bar">
@@ -277,7 +336,7 @@ export default function CrudPuestos() {
               </option>
             ))}
           </select>
-          <span className="cc-pagesize-label">por pagina</span>
+          <span className="cc-pagesize-label">por página</span>
         </div>
         <div className="cc-pagination">
           <button

@@ -171,4 +171,43 @@ public class UsuarioService
             }
         }, CancellationToken.None);
     }
+
+    public async Task<bool> CambiarPasswordAsync(long id, string passwordActual, string passwordNueva)
+    {
+        return await _pipeline.ExecuteAsync(async ct =>
+        {
+            await using var ctx = await _factory.CreateDbContextAsync(ct);
+            await using var tx = await ctx.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+
+            try
+            {
+                var usuario = await ctx.Usuarios.FindAsync(new object[] { id }, ct);
+                if (usuario is null) return false;
+
+                var verificacion = _passwordHasher.VerifyHashedPassword(new { }, usuario.PasswordHash, passwordActual);
+                if (verificacion == PasswordVerificationResult.Failed)
+                {
+                    throw new InvalidOperationException("La contraseña actual no es correcta.");
+                }
+
+                usuario.PasswordHash = _passwordHasher.HashPassword(new { }, passwordNueva);
+
+                await ctx.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                _logger.LogInformation("Contraseña actualizada exitosamente para Usuario Id={Id}", id);
+                return true;
+            }
+            catch (Exception ex) when (PostgresErrorHelper.IsSerializationFailure(ex))
+            {
+                await tx.RollbackAsync(ct);
+                throw new RetryableException("Conflicto de serialización al cambiar contraseña.", ex);
+            }
+            catch
+            {
+                await tx.RollbackAsync(ct);
+                throw;
+            }
+        }, CancellationToken.None);
+    }
 }

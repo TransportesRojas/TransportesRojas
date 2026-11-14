@@ -1,4 +1,4 @@
-﻿namespace Backend.BDFolder;
+namespace Backend.BDFolder;
 
 public class Empleado
 {
@@ -18,6 +18,7 @@ public class Empleado
     public Usuario Usuario { get; set; } = null!;
     public Sucursal? Sucursal { get; set; }
     public ICollection<EmpleadoPuestoHistorial> PuestoHistorial { get; set; } = new List<EmpleadoPuestoHistorial>();
+    public ICollection<Sucursal> SucursalesACargo { get; set; } = new List<Sucursal>();
 }
 
 public class EmpleadoPuestoHistorial
@@ -25,6 +26,7 @@ public class EmpleadoPuestoHistorial
     public long Id { get; set; }
     public long EmpleadoId { get; set; }
     public long PuestoId { get; set; }
+    public long? PuestoAnteriorId { get; set; }
     public DateOnly FechaInicio { get; set; }
     public DateOnly? FechaFin { get; set; }
     public string? Motivo { get; set; }
@@ -33,22 +35,25 @@ public class EmpleadoPuestoHistorial
 
     public Empleado Empleado { get; set; } = null!;
     public Puesto Puesto { get; set; } = null!;
+    public Puesto? PuestoAnterior { get; set; }
+    public Empleado? RegistradoPorEmpleado { get; set; }
 }
 
 public class Cliente
 {
     public long Id { get; set; }
-    public long? UsuarioId { get; set; }
+    public long UsuarioId { get; set; }
     public string? Nombre { get; set; }
     public string? ApellidoPaterno { get; set; }
     public string? ApellidoMaterno { get; set; }
     public string? Telefono { get; set; }
     public string? Email { get; set; }
+    public string? MotivoEdicion { get; set; }
     public bool Activo { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
-    public Usuario? Usuario { get; set; }
+    public Usuario Usuario { get; set; } = null!;
     public ICollection<ClienteDireccion> Direcciones { get; set; } = new List<ClienteDireccion>();
 }
 

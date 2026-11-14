@@ -1,4 +1,4 @@
-﻿namespace Backend.BDFolder;
+namespace Backend.BDFolder;
 
 using System.Text.Json;
 
@@ -11,6 +11,7 @@ public class Envio
     public string DestinatarioNombre { get; set; } = null!;
     public string DestinatarioTelefono { get; set; } = null!;
     public string? DestinatarioEmail { get; set; }
+    public int IntentoReparto { get; set; } = 0;
 
     public bool RequiereRecoleccion { get; set; }
     public long? SucursalRecepcionId { get; set; }
@@ -20,11 +21,11 @@ public class Envio
     public JsonDocument? DireccionOrigenSnapshot { get; set; }
     public JsonDocument? DireccionDestinoSnapshot { get; set; }
 
-    public decimal? PesoKg { get; set; }
-    public decimal? LargoCm { get; set; }
-    public decimal? AnchoCm { get; set; }
-    public decimal? AltoCm { get; set; }
-    public string? Descripcion { get; set; }
+    public decimal PesoKg { get; set; }
+    public decimal LargoCm { get; set; }
+    public decimal AnchoCm { get; set; }
+    public decimal AltoCm { get; set; }
+    public string Descripcion { get; set; } = null!;
     public decimal? ValorDeclarado { get; set; }
 
     public string? CodigoValidacionHash { get; set; }
@@ -46,9 +47,25 @@ public class Envio
 
     public ICollection<EventoEnvio> Eventos { get; set; } = new List<EventoEnvio>();
     public ICollection<RutaEnvio> Rutas { get; set; } = new List<RutaEnvio>();
-    public ICollection<CitaRecoleccion> Citas { get; set; } = new List<CitaRecoleccion>();
+    public ICollection<Entrega> Entregas { get; set; } = new List<Entrega>();
+    public ICollection<AvisoSms> AvisosSms { get; set; } = new List<AvisoSms>();
     public RecepcionPaquete? Recepcion { get; set; }
-    public Entrega? Entrega { get; set; }
+}
+
+public class AvisoSms
+{
+    public long Id { get; set; }
+    public long EnvioId { get; set; }
+    public int IntentoReparto { get; set; }
+    public string TelefonoDestino { get; set; } = null!;
+    public string Mensaje { get; set; } = null!;
+    public EstadoAvisoSms Estado { get; set; } = EstadoAvisoSms.Pendiente;
+    public string? IdProveedor { get; set; }
+    public int IntentosReintento { get; set; } = 0;
+    public DateTimeOffset FechaSolicitud { get; set; }
+    public DateTimeOffset? FechaConfirmacion { get; set; }
+
+    public Envio Envio { get; set; } = null!;
 }
 
 public class EventoEnvio
@@ -82,21 +99,4 @@ public class RecepcionPaquete
 
     public Envio Envio { get; set; } = null!;
     public Empleado RecibidoPorEmpleado { get; set; } = null!;
-}
-
-public class CitaRecoleccion
-{
-    public long Id { get; set; }
-    public long EnvioId { get; set; }
-    public long DireccionRecoleccionId { get; set; }
-    public DateTimeOffset FechaHoraSolicitada { get; set; }
-    public DateTimeOffset? FechaHoraConfirmada { get; set; }
-    public EstadoCitaRecoleccion Estado { get; set; } = EstadoCitaRecoleccion.Solicitada;
-    public string? Motivo { get; set; }
-    public string? Observaciones { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-
-    public Envio Envio { get; set; } = null!;
-    public Direccion DireccionRecoleccion { get; set; } = null!;
 }

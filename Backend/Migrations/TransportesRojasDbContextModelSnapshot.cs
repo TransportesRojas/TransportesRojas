@@ -36,10 +36,6 @@ namespace Backend.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("atendida_por");
 
-                    b.Property<long?>("AtendidaPorEmpleadoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("atendida_por_empleado_id");
-
                     b.Property<long?>("ChoferId")
                         .HasColumnType("bigint")
                         .HasColumnName("chofer_id");
@@ -94,7 +90,7 @@ namespace Backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AtendidaPorEmpleadoId");
+                    b.HasIndex("AtendidaPor");
 
                     b.HasIndex("ChoferId");
 
@@ -125,10 +121,6 @@ namespace Backend.Migrations
                     b.Property<long?>("AtendidaPor")
                         .HasColumnType("bigint")
                         .HasColumnName("atendida_por");
-
-                    b.Property<long?>("AtendidaPorEmpleadoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("atendida_por_empleado_id");
 
                     b.Property<string>("Descripcion")
                         .HasColumnType("text")
@@ -172,7 +164,7 @@ namespace Backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AtendidaPorEmpleadoId");
+                    b.HasIndex("AtendidaPor");
 
                     b.HasIndex("Estado");
 
@@ -230,6 +222,139 @@ namespace Backend.Migrations
                     b.ToTable("asignacion_flotilla_chofer", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.BDFolder.AvisoSms", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("EnvioId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("envio_id");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("estado");
+
+                    b.Property<DateTimeOffset?>("FechaConfirmacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_confirmacion");
+
+                    b.Property<DateTimeOffset>("FechaSolicitud")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_solicitud");
+
+                    b.Property<string>("IdProveedor")
+                        .HasColumnType("text")
+                        .HasColumnName("id_proveedor");
+
+                    b.Property<int>("IntentoReparto")
+                        .HasColumnType("integer")
+                        .HasColumnName("intento_reparto");
+
+                    b.Property<int>("IntentosReintento")
+                        .HasColumnType("integer")
+                        .HasColumnName("intentos_reintento");
+
+                    b.Property<string>("Mensaje")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("mensaje");
+
+                    b.Property<string>("TelefonoDestino")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("telefono_destino");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnvioId");
+
+                    b.HasIndex("Estado");
+
+                    b.HasIndex("EnvioId", "IntentoReparto")
+                        .IsUnique();
+
+                    b.ToTable("aviso_sms", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CambioRuta", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("AfectaEntrega")
+                        .HasColumnType("boolean")
+                        .HasColumnName("afecta_entrega");
+
+                    b.Property<long>("ChoferId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("chofer_id");
+
+                    b.Property<string>("DescripcionTrayecto")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("descripcion_trayecto");
+
+                    b.Property<string>("EstadoAviso")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("estado_aviso");
+
+                    b.Property<DateTimeOffset>("FechaEvento")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_evento");
+
+                    b.Property<DateTimeOffset>("FechaRegistro")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_registro");
+
+                    b.Property<string>("Folio")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("folio");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("motivo");
+
+                    b.Property<string>("ReferenciaLugar")
+                        .HasColumnType("text")
+                        .HasColumnName("referencia_lugar");
+
+                    b.Property<long>("RutaId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ruta_id");
+
+                    b.Property<long?>("UnidadId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unidad_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChoferId");
+
+                    b.HasIndex("FechaEvento");
+
+                    b.HasIndex("Folio")
+                        .IsUnique();
+
+                    b.HasIndex("RutaId");
+
+                    b.HasIndex("UnidadId");
+
+                    b.ToTable("cambio_ruta", (string)null);
+                });
+
             modelBuilder.Entity("Backend.BDFolder.Cancelacion", b =>
                 {
                     b.Property<long>("Id")
@@ -277,6 +402,346 @@ namespace Backend.Migrations
                     b.HasIndex("EnvioId");
 
                     b.ToTable("cancelacion", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatAsentamiento", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("activo");
+
+                    b.Property<string>("CCp")
+                        .HasColumnType("text")
+                        .HasColumnName("c_cp");
+
+                    b.Property<string>("CCveCiudad")
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .HasColumnName("c_cve_ciudad")
+                        .IsFixedLength();
+
+                    b.Property<string>("CEstado")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .HasColumnName("c_estado")
+                        .IsFixedLength();
+
+                    b.Property<string>("CMnpio")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("c_mnpio")
+                        .IsFixedLength();
+
+                    b.Property<string>("COficina")
+                        .HasMaxLength(5)
+                        .HasColumnType("character(5)")
+                        .HasColumnName("c_oficina")
+                        .IsFixedLength();
+
+                    b.Property<string>("CTipoAsenta")
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .HasColumnName("c_tipo_asenta")
+                        .IsFixedLength();
+
+                    b.Property<string>("DAsenta")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("d_asenta");
+
+                    b.Property<string>("DCiudad")
+                        .HasColumnType("text")
+                        .HasColumnName("d_ciudad");
+
+                    b.Property<string>("DCodigo")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character(5)")
+                        .HasColumnName("d_codigo")
+                        .IsFixedLength();
+
+                    b.Property<string>("DCp")
+                        .HasMaxLength(5)
+                        .HasColumnType("character(5)")
+                        .HasColumnName("d_cp")
+                        .IsFixedLength();
+
+                    b.Property<string>("DTipoAsenta")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("d_tipo_asenta");
+
+                    b.Property<string>("DZona")
+                        .HasColumnType("text")
+                        .HasColumnName("d_zona");
+
+                    b.Property<short>("EstadoId")
+                        .HasColumnType("smallint")
+                        .HasColumnName("estado_id");
+
+                    b.Property<string>("IdAsentaCpcons")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character(4)")
+                        .HasColumnName("id_asenta_cpcons")
+                        .IsFixedLength();
+
+                    b.Property<int>("MunicipioId")
+                        .HasColumnType("integer")
+                        .HasColumnName("municipio_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DAsenta")
+                        .HasDatabaseName("idx_cat_asentamiento_nombre");
+
+                    b.HasIndex("DCodigo")
+                        .HasDatabaseName("idx_cat_asentamiento_cp");
+
+                    b.HasIndex("EstadoId")
+                        .HasDatabaseName("idx_cat_asentamiento_estado");
+
+                    b.HasIndex("MunicipioId")
+                        .HasDatabaseName("idx_cat_asentamiento_municipio");
+
+                    b.HasIndex("CEstado", "CMnpio", "IdAsentaCpcons", "DCodigo")
+                        .IsUnique();
+
+                    b.ToTable("cat_asentamiento", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatEstado", b =>
+                {
+                    b.Property<short>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<short>("Id"));
+
+                    b.Property<string>("Abreviatura")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("abreviatura");
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("activo");
+
+                    b.Property<string>("CveEnt")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .HasColumnName("cve_ent")
+                        .IsFixedLength();
+
+                    b.Property<string>("Cvegeo")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .HasColumnName("cvegeo")
+                        .IsFixedLength();
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("nombre");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CveEnt")
+                        .IsUnique();
+
+                    b.HasIndex("Cvegeo")
+                        .IsUnique();
+
+                    b.HasIndex("Nombre")
+                        .HasDatabaseName("idx_cat_estado_nombre");
+
+                    b.ToTable("cat_estado", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatLocalidad", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("activo");
+
+                    b.Property<int?>("Altitud")
+                        .HasColumnType("integer")
+                        .HasColumnName("altitud");
+
+                    b.Property<string>("Ambito")
+                        .HasMaxLength(1)
+                        .HasColumnType("character(1)")
+                        .HasColumnName("ambito")
+                        .IsFixedLength();
+
+                    b.Property<string>("CveEnt")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .HasColumnName("cve_ent")
+                        .IsFixedLength();
+
+                    b.Property<string>("CveLoc")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character(4)")
+                        .HasColumnName("cve_loc")
+                        .IsFixedLength();
+
+                    b.Property<string>("CveMun")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("cve_mun")
+                        .IsFixedLength();
+
+                    b.Property<string>("Cvegeo")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character(9)")
+                        .HasColumnName("cvegeo")
+                        .IsFixedLength();
+
+                    b.Property<short>("EstadoId")
+                        .HasColumnType("smallint")
+                        .HasColumnName("estado_id");
+
+                    b.Property<string>("Estatus")
+                        .HasColumnType("text")
+                        .HasColumnName("estatus");
+
+                    b.Property<decimal?>("LatDecimal")
+                        .HasPrecision(10, 7)
+                        .HasColumnType("numeric(10,7)")
+                        .HasColumnName("lat_decimal");
+
+                    b.Property<decimal?>("LonDecimal")
+                        .HasPrecision(10, 7)
+                        .HasColumnType("numeric(10,7)")
+                        .HasColumnName("lon_decimal");
+
+                    b.Property<int>("MunicipioId")
+                        .HasColumnType("integer")
+                        .HasColumnName("municipio_id");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("nombre");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Cvegeo")
+                        .IsUnique();
+
+                    b.HasIndex("EstadoId")
+                        .HasDatabaseName("idx_cat_localidad_estado");
+
+                    b.HasIndex("MunicipioId")
+                        .HasDatabaseName("idx_cat_localidad_municipio");
+
+                    b.HasIndex("Nombre")
+                        .HasDatabaseName("idx_cat_localidad_nombre");
+
+                    b.HasIndex("MunicipioId", "CveLoc")
+                        .IsUnique();
+
+                    b.HasIndex("CveEnt", "CveMun", "CveLoc")
+                        .IsUnique();
+
+                    b.ToTable("cat_localidad", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatMunicipio", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("activo");
+
+                    b.Property<string>("CveCab")
+                        .HasMaxLength(4)
+                        .HasColumnType("character(4)")
+                        .HasColumnName("cve_cab")
+                        .IsFixedLength();
+
+                    b.Property<string>("CveEnt")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character(2)")
+                        .HasColumnName("cve_ent")
+                        .IsFixedLength();
+
+                    b.Property<string>("CveMun")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("cve_mun")
+                        .IsFixedLength();
+
+                    b.Property<string>("Cvegeo")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character(5)")
+                        .HasColumnName("cvegeo")
+                        .IsFixedLength();
+
+                    b.Property<short>("EstadoId")
+                        .HasColumnType("smallint")
+                        .HasColumnName("estado_id");
+
+                    b.Property<string>("NomCab")
+                        .HasColumnType("text")
+                        .HasColumnName("nom_cab");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("nombre");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Cvegeo")
+                        .IsUnique();
+
+                    b.HasIndex("EstadoId")
+                        .HasDatabaseName("idx_cat_municipio_estado");
+
+                    b.HasIndex("Nombre")
+                        .HasDatabaseName("idx_cat_municipio_nombre");
+
+                    b.HasIndex("CveEnt", "CveMun")
+                        .IsUnique();
+
+                    b.HasIndex("EstadoId", "CveMun")
+                        .IsUnique();
+
+                    b.ToTable("cat_municipio", (string)null);
                 });
 
             modelBuilder.Entity("Backend.BDFolder.CitaRecoleccion", b =>
@@ -379,7 +844,7 @@ namespace Backend.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<long?>("UsuarioId")
+                    b.Property<long>("UsuarioId")
                         .HasColumnType("bigint")
                         .HasColumnName("usuario_id");
 
@@ -512,6 +977,10 @@ namespace Backend.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("activo");
 
+                    b.Property<long?>("AsentamientoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("asentamiento_id");
+
                     b.Property<string>("Calle")
                         .HasColumnType("text")
                         .HasColumnName("calle");
@@ -528,14 +997,30 @@ namespace Backend.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("EntreCalles")
+                        .HasColumnType("text")
+                        .HasColumnName("entre_calles");
+
                     b.Property<string>("Estado")
                         .HasColumnType("text")
                         .HasColumnName("estado");
+
+                    b.Property<short?>("EstadoId")
+                        .HasColumnType("smallint")
+                        .HasColumnName("estado_id");
 
                     b.Property<decimal?>("Latitud")
                         .HasPrecision(10, 7)
                         .HasColumnType("numeric(10,7)")
                         .HasColumnName("latitud");
+
+                    b.Property<string>("Localidad")
+                        .HasColumnType("text")
+                        .HasColumnName("localidad");
+
+                    b.Property<long?>("LocalidadId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("localidad_id");
 
                     b.Property<decimal?>("Longitud")
                         .HasPrecision(10, 7)
@@ -550,6 +1035,10 @@ namespace Backend.Migrations
                     b.Property<string>("Municipio")
                         .HasColumnType("text")
                         .HasColumnName("municipio");
+
+                    b.Property<int?>("MunicipioId")
+                        .HasColumnType("integer")
+                        .HasColumnName("municipio_id");
 
                     b.Property<string>("NumeroExterior")
                         .HasColumnType("text")
@@ -575,6 +1064,20 @@ namespace Backend.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AsentamientoId")
+                        .HasDatabaseName("idx_direccion_asentamiento");
+
+                    b.HasIndex("CodigoPostal")
+                        .HasDatabaseName("idx_direccion_cp");
+
+                    b.HasIndex("LocalidadId")
+                        .HasDatabaseName("idx_direccion_localidad");
+
+                    b.HasIndex("MunicipioId");
+
+                    b.HasIndex("EstadoId", "MunicipioId")
+                        .HasDatabaseName("idx_direccion_estado_mun");
 
                     b.ToTable("direccion", (string)null);
                 });
@@ -673,6 +1176,10 @@ namespace Backend.Migrations
                         .HasColumnType("text")
                         .HasColumnName("motivo");
 
+                    b.Property<long?>("PuestoAnteriorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("puesto_anterior_id");
+
                     b.Property<long>("PuestoId")
                         .HasColumnType("bigint")
                         .HasColumnName("puesto_id");
@@ -685,7 +1192,11 @@ namespace Backend.Migrations
 
                     b.HasIndex("EmpleadoId");
 
+                    b.HasIndex("PuestoAnteriorId");
+
                     b.HasIndex("PuestoId");
+
+                    b.HasIndex("RegistradoPor");
 
                     b.ToTable("empleado_puesto_historial", (string)null);
                 });
@@ -732,6 +1243,10 @@ namespace Backend.Migrations
                         .HasColumnType("text")
                         .HasColumnName("firma_url");
 
+                    b.Property<int>("IntentoReparto")
+                        .HasColumnType("integer")
+                        .HasColumnName("intento_reparto");
+
                     b.Property<decimal?>("Latitud")
                         .HasPrecision(10, 7)
                         .HasColumnType("numeric(10,7)")
@@ -758,10 +1273,10 @@ namespace Backend.Migrations
 
                     b.HasIndex("ChoferId");
 
-                    b.HasIndex("EnvioId")
-                        .IsUnique();
-
                     b.HasIndex("RutaId");
+
+                    b.HasIndex("EnvioId", "IntentoReparto")
+                        .IsUnique();
 
                     b.ToTable("entrega", (string)null);
                 });
@@ -775,12 +1290,12 @@ namespace Backend.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
-                    b.Property<decimal?>("AltoCm")
+                    b.Property<decimal>("AltoCm")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("alto_cm");
 
-                    b.Property<decimal?>("AnchoCm")
+                    b.Property<decimal>("AnchoCm")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("ancho_cm");
@@ -798,6 +1313,7 @@ namespace Backend.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("Descripcion")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("descripcion");
 
@@ -849,7 +1365,11 @@ namespace Backend.Migrations
                         .HasColumnType("text")
                         .HasColumnName("guia");
 
-                    b.Property<decimal?>("LargoCm")
+                    b.Property<int>("IntentoReparto")
+                        .HasColumnType("integer")
+                        .HasColumnName("intento_reparto");
+
+                    b.Property<decimal>("LargoCm")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("largo_cm");
@@ -859,7 +1379,7 @@ namespace Backend.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("metadata");
 
-                    b.Property<decimal?>("PesoKg")
+                    b.Property<decimal>("PesoKg")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("peso_kg");
@@ -903,6 +1423,8 @@ namespace Backend.Migrations
 
                     b.HasIndex("Guia")
                         .IsUnique();
+
+                    b.HasIndex("IntentoReparto");
 
                     b.HasIndex("RemitenteId");
 
@@ -1047,6 +1569,47 @@ namespace Backend.Migrations
                     b.ToTable("flotilla", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.BDFolder.HorarioSucursal", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DiaSemana")
+                        .HasColumnType("integer")
+                        .HasColumnName("dia_semana");
+
+                    b.Property<bool>("EsDiaDescanso")
+                        .HasColumnType("boolean")
+                        .HasColumnName("es_dia_descanso");
+
+                    b.Property<TimeOnly?>("HoraApertura")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("hora_apertura");
+
+                    b.Property<TimeOnly?>("HoraCierre")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("hora_cierre");
+
+                    b.Property<long>("SucursalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sucursal_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SucursalId")
+                        .HasDatabaseName("idx_horario_sucursal");
+
+                    b.ToTable("horario_sucursal", (string)null);
+                });
+
             modelBuilder.Entity("Backend.BDFolder.Incidencia", b =>
                 {
                     b.Property<long>("Id")
@@ -1145,10 +1708,6 @@ namespace Backend.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("realizado_por");
 
-                    b.Property<long?>("RealizadoPorEmpleadoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("realizado_por_empleado_id");
-
                     b.Property<string>("Taller")
                         .HasColumnType("text")
                         .HasColumnName("taller");
@@ -1167,7 +1726,7 @@ namespace Backend.Migrations
 
                     b.HasIndex("FechaRealizado");
 
-                    b.HasIndex("RealizadoPorEmpleadoId");
+                    b.HasIndex("RealizadoPor");
 
                     b.HasIndex("TipoMantenimientoId");
 
@@ -1257,10 +1816,6 @@ namespace Backend.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("atendida_por");
 
-                    b.Property<long?>("AtendidaPorEmpleadoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("atendida_por_empleado_id");
-
                     b.Property<string>("Descripcion")
                         .HasColumnType("text")
                         .HasColumnName("descripcion");
@@ -1298,7 +1853,7 @@ namespace Backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AtendidaPorEmpleadoId");
+                    b.HasIndex("AtendidaPor");
 
                     b.HasIndex("EnvioId");
 
@@ -1406,16 +1961,12 @@ namespace Backend.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("recibido_por");
 
-                    b.Property<long>("RecibidoPorEmpleadoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("recibido_por_empleado_id");
-
                     b.HasKey("Id");
 
                     b.HasIndex("EnvioId")
                         .IsUnique();
 
-                    b.HasIndex("RecibidoPorEmpleadoId");
+                    b.HasIndex("RecibidoPor");
 
                     b.ToTable("recepcion_paquete", (string)null);
                 });
@@ -1567,10 +2118,6 @@ namespace Backend.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("chofer_id");
 
-                    b.Property<long?>("CreadoPorId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("creado_por_id");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1640,7 +2187,7 @@ namespace Backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreadoPorId");
+                    b.HasIndex("CreatedBy");
 
                     b.HasIndex("Estado");
 
@@ -1704,6 +2251,10 @@ namespace Backend.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("activo");
 
+                    b.Property<string>("Cobertura")
+                        .HasColumnType("text")
+                        .HasColumnName("cobertura");
+
                     b.Property<string>("Codigo")
                         .HasColumnType("text")
                         .HasColumnName("codigo");
@@ -1725,6 +2276,14 @@ namespace Backend.Migrations
                         .HasColumnType("text")
                         .HasColumnName("nombre");
 
+                    b.Property<string>("NombreCorto")
+                        .HasColumnType("text")
+                        .HasColumnName("nombre_corto");
+
+                    b.Property<long?>("ResponsableId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("responsable_id");
+
                     b.Property<string>("Telefono")
                         .HasColumnType("text")
                         .HasColumnName("telefono");
@@ -1740,7 +2299,85 @@ namespace Backend.Migrations
 
                     b.HasIndex("DireccionId");
 
+                    b.HasIndex("NombreCorto")
+                        .HasDatabaseName("idx_sucursal_nombre_corto");
+
+                    b.HasIndex("ResponsableId");
+
                     b.ToTable("sucursal", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.SucursalCobertura", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("activo");
+
+                    b.Property<bool>("AplicaEntrega")
+                        .HasColumnType("boolean")
+                        .HasColumnName("aplica_entrega");
+
+                    b.Property<bool>("AplicaRecoleccion")
+                        .HasColumnType("boolean")
+                        .HasColumnName("aplica_recoleccion");
+
+                    b.Property<string>("CodigoPostal")
+                        .HasMaxLength(5)
+                        .HasColumnType("character(5)")
+                        .HasColumnName("codigo_postal")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<short>("DiasEstimados")
+                        .HasColumnType("smallint")
+                        .HasColumnName("dias_estimados");
+
+                    b.Property<bool>("EsZonaExtendida")
+                        .HasColumnType("boolean")
+                        .HasColumnName("es_zona_extendida");
+
+                    b.Property<short>("EstadoId")
+                        .HasColumnType("smallint")
+                        .HasColumnName("estado_id");
+
+                    b.Property<int?>("MunicipioId")
+                        .HasColumnType("integer")
+                        .HasColumnName("municipio_id");
+
+                    b.Property<long>("SucursalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sucursal_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodigoPostal")
+                        .HasDatabaseName("idx_suc_cobertura_cp");
+
+                    b.HasIndex("EstadoId")
+                        .HasDatabaseName("idx_suc_cobertura_estado");
+
+                    b.HasIndex("MunicipioId")
+                        .HasDatabaseName("idx_suc_cobertura_municipio");
+
+                    b.HasIndex("SucursalId")
+                        .HasDatabaseName("idx_suc_cobertura_sucursal");
+
+                    b.HasIndex("SucursalId", "EstadoId", "MunicipioId", "CodigoPostal")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("SucursalId", "EstadoId", "MunicipioId", "CodigoPostal"), false);
+
+                    b.ToTable("sucursal_cobertura", (string)null);
                 });
 
             modelBuilder.Entity("Backend.BDFolder.TelemetriaUnidad", b =>
@@ -2044,7 +2681,7 @@ namespace Backend.Migrations
                 {
                     b.HasOne("Backend.BDFolder.Empleado", "AtendidaPorEmpleado")
                         .WithMany()
-                        .HasForeignKey("AtendidaPorEmpleadoId");
+                        .HasForeignKey("AtendidaPor");
 
                     b.HasOne("Backend.BDFolder.Empleado", "Chofer")
                         .WithMany()
@@ -2083,7 +2720,7 @@ namespace Backend.Migrations
                 {
                     b.HasOne("Backend.BDFolder.Empleado", "AtendidaPorEmpleado")
                         .WithMany()
-                        .HasForeignKey("AtendidaPorEmpleadoId");
+                        .HasForeignKey("AtendidaPor");
 
                     b.HasOne("Backend.BDFolder.TipoMantenimiento", "TipoMantenimiento")
                         .WithMany()
@@ -2123,6 +2760,42 @@ namespace Backend.Migrations
                     b.Navigation("Flotilla");
                 });
 
+            modelBuilder.Entity("Backend.BDFolder.AvisoSms", b =>
+                {
+                    b.HasOne("Backend.BDFolder.Envio", "Envio")
+                        .WithMany("AvisosSms")
+                        .HasForeignKey("EnvioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Envio");
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CambioRuta", b =>
+                {
+                    b.HasOne("Backend.BDFolder.Empleado", "Chofer")
+                        .WithMany()
+                        .HasForeignKey("ChoferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.BDFolder.Ruta", "Ruta")
+                        .WithMany("CambiosRuta")
+                        .HasForeignKey("RutaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.BDFolder.Unidad", "Unidad")
+                        .WithMany()
+                        .HasForeignKey("UnidadId");
+
+                    b.Navigation("Chofer");
+
+                    b.Navigation("Ruta");
+
+                    b.Navigation("Unidad");
+                });
+
             modelBuilder.Entity("Backend.BDFolder.Cancelacion", b =>
                 {
                     b.HasOne("Backend.BDFolder.Usuario", "ActorUsuario")
@@ -2138,6 +2811,55 @@ namespace Backend.Migrations
                     b.Navigation("ActorUsuario");
 
                     b.Navigation("Envio");
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatAsentamiento", b =>
+                {
+                    b.HasOne("Backend.BDFolder.CatEstado", "Estado")
+                        .WithMany("Asentamientos")
+                        .HasForeignKey("EstadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.BDFolder.CatMunicipio", "Municipio")
+                        .WithMany("Asentamientos")
+                        .HasForeignKey("MunicipioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Estado");
+
+                    b.Navigation("Municipio");
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatLocalidad", b =>
+                {
+                    b.HasOne("Backend.BDFolder.CatEstado", "Estado")
+                        .WithMany("Localidades")
+                        .HasForeignKey("EstadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.BDFolder.CatMunicipio", "Municipio")
+                        .WithMany("Localidades")
+                        .HasForeignKey("MunicipioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Estado");
+
+                    b.Navigation("Municipio");
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatMunicipio", b =>
+                {
+                    b.HasOne("Backend.BDFolder.CatEstado", "Estado")
+                        .WithMany("Municipios")
+                        .HasForeignKey("EstadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Estado");
                 });
 
             modelBuilder.Entity("Backend.BDFolder.CitaRecoleccion", b =>
@@ -2163,7 +2885,9 @@ namespace Backend.Migrations
                 {
                     b.HasOne("Backend.BDFolder.Usuario", "Usuario")
                         .WithOne("Cliente")
-                        .HasForeignKey("Backend.BDFolder.Cliente", "UsuarioId");
+                        .HasForeignKey("Backend.BDFolder.Cliente", "UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Usuario");
                 });
@@ -2204,6 +2928,33 @@ namespace Backend.Migrations
                     b.Navigation("SucursalDestino");
                 });
 
+            modelBuilder.Entity("Backend.BDFolder.Direccion", b =>
+                {
+                    b.HasOne("Backend.BDFolder.CatAsentamiento", "CatAsentamiento")
+                        .WithMany("Direcciones")
+                        .HasForeignKey("AsentamientoId");
+
+                    b.HasOne("Backend.BDFolder.CatEstado", "CatEstado")
+                        .WithMany("Direcciones")
+                        .HasForeignKey("EstadoId");
+
+                    b.HasOne("Backend.BDFolder.CatLocalidad", "CatLocalidad")
+                        .WithMany("Direcciones")
+                        .HasForeignKey("LocalidadId");
+
+                    b.HasOne("Backend.BDFolder.CatMunicipio", "CatMunicipio")
+                        .WithMany("Direcciones")
+                        .HasForeignKey("MunicipioId");
+
+                    b.Navigation("CatAsentamiento");
+
+                    b.Navigation("CatEstado");
+
+                    b.Navigation("CatLocalidad");
+
+                    b.Navigation("CatMunicipio");
+                });
+
             modelBuilder.Entity("Backend.BDFolder.Empleado", b =>
                 {
                     b.HasOne("Backend.BDFolder.Sucursal", "Sucursal")
@@ -2229,15 +2980,27 @@ namespace Backend.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Backend.BDFolder.Puesto", "PuestoAnterior")
+                        .WithMany()
+                        .HasForeignKey("PuestoAnteriorId");
+
                     b.HasOne("Backend.BDFolder.Puesto", "Puesto")
                         .WithMany()
                         .HasForeignKey("PuestoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Backend.BDFolder.Empleado", "RegistradoPorEmpleado")
+                        .WithMany()
+                        .HasForeignKey("RegistradoPor");
+
                     b.Navigation("Empleado");
 
                     b.Navigation("Puesto");
+
+                    b.Navigation("PuestoAnterior");
+
+                    b.Navigation("RegistradoPorEmpleado");
                 });
 
             modelBuilder.Entity("Backend.BDFolder.Entrega", b =>
@@ -2249,8 +3012,8 @@ namespace Backend.Migrations
                         .IsRequired();
 
                     b.HasOne("Backend.BDFolder.Envio", "Envio")
-                        .WithOne("Entrega")
-                        .HasForeignKey("Backend.BDFolder.Entrega", "EnvioId")
+                        .WithMany("Entregas")
+                        .HasForeignKey("EnvioId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -2349,6 +3112,17 @@ namespace Backend.Migrations
                     b.Navigation("Supervisor");
                 });
 
+            modelBuilder.Entity("Backend.BDFolder.HorarioSucursal", b =>
+                {
+                    b.HasOne("Backend.BDFolder.Sucursal", "Sucursal")
+                        .WithMany("Horarios")
+                        .HasForeignKey("SucursalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Sucursal");
+                });
+
             modelBuilder.Entity("Backend.BDFolder.Incidencia", b =>
                 {
                     b.HasOne("Backend.BDFolder.Envio", "Envio")
@@ -2372,7 +3146,7 @@ namespace Backend.Migrations
 
                     b.HasOne("Backend.BDFolder.Empleado", "RealizadoPorEmpleado")
                         .WithMany()
-                        .HasForeignKey("RealizadoPorEmpleadoId");
+                        .HasForeignKey("RealizadoPor");
 
                     b.HasOne("Backend.BDFolder.TipoMantenimiento", "TipoMantenimiento")
                         .WithMany()
@@ -2399,7 +3173,7 @@ namespace Backend.Migrations
                 {
                     b.HasOne("Backend.BDFolder.Empleado", "AtendidaPorEmpleado")
                         .WithMany()
-                        .HasForeignKey("AtendidaPorEmpleadoId");
+                        .HasForeignKey("AtendidaPor");
 
                     b.HasOne("Backend.BDFolder.Envio", "Envio")
                         .WithMany()
@@ -2439,7 +3213,7 @@ namespace Backend.Migrations
 
                     b.HasOne("Backend.BDFolder.Empleado", "RecibidoPorEmpleado")
                         .WithMany()
-                        .HasForeignKey("RecibidoPorEmpleadoId")
+                        .HasForeignKey("RecibidoPor")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -2507,7 +3281,7 @@ namespace Backend.Migrations
 
                     b.HasOne("Backend.BDFolder.Empleado", "CreadoPor")
                         .WithMany()
-                        .HasForeignKey("CreadoPorId");
+                        .HasForeignKey("CreatedBy");
 
                     b.HasOne("Backend.BDFolder.Flotilla", "Flotilla")
                         .WithMany()
@@ -2557,7 +3331,39 @@ namespace Backend.Migrations
                         .WithMany("Sucursales")
                         .HasForeignKey("DireccionId");
 
+                    b.HasOne("Backend.BDFolder.Empleado", "Responsable")
+                        .WithMany("SucursalesACargo")
+                        .HasForeignKey("ResponsableId")
+                        .HasConstraintName("fk_sucursal_responsable");
+
                     b.Navigation("Direccion");
+
+                    b.Navigation("Responsable");
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.SucursalCobertura", b =>
+                {
+                    b.HasOne("Backend.BDFolder.CatEstado", "Estado")
+                        .WithMany("CoberturasSucursal")
+                        .HasForeignKey("EstadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.BDFolder.CatMunicipio", "Municipio")
+                        .WithMany("CoberturasSucursal")
+                        .HasForeignKey("MunicipioId");
+
+                    b.HasOne("Backend.BDFolder.Sucursal", "Sucursal")
+                        .WithMany("Coberturas")
+                        .HasForeignKey("SucursalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Estado");
+
+                    b.Navigation("Municipio");
+
+                    b.Navigation("Sucursal");
                 });
 
             modelBuilder.Entity("Backend.BDFolder.TelemetriaUnidad", b =>
@@ -2622,6 +3428,40 @@ namespace Backend.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("Backend.BDFolder.CatAsentamiento", b =>
+                {
+                    b.Navigation("Direcciones");
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatEstado", b =>
+                {
+                    b.Navigation("Asentamientos");
+
+                    b.Navigation("CoberturasSucursal");
+
+                    b.Navigation("Direcciones");
+
+                    b.Navigation("Localidades");
+
+                    b.Navigation("Municipios");
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatLocalidad", b =>
+                {
+                    b.Navigation("Direcciones");
+                });
+
+            modelBuilder.Entity("Backend.BDFolder.CatMunicipio", b =>
+                {
+                    b.Navigation("Asentamientos");
+
+                    b.Navigation("CoberturasSucursal");
+
+                    b.Navigation("Direcciones");
+
+                    b.Navigation("Localidades");
+                });
+
             modelBuilder.Entity("Backend.BDFolder.Cliente", b =>
                 {
                     b.Navigation("Direcciones");
@@ -2637,13 +3477,17 @@ namespace Backend.Migrations
             modelBuilder.Entity("Backend.BDFolder.Empleado", b =>
                 {
                     b.Navigation("PuestoHistorial");
+
+                    b.Navigation("SucursalesACargo");
                 });
 
             modelBuilder.Entity("Backend.BDFolder.Envio", b =>
                 {
+                    b.Navigation("AvisosSms");
+
                     b.Navigation("Citas");
 
-                    b.Navigation("Entrega");
+                    b.Navigation("Entregas");
 
                     b.Navigation("Eventos");
 
@@ -2676,14 +3520,20 @@ namespace Backend.Migrations
 
             modelBuilder.Entity("Backend.BDFolder.Ruta", b =>
                 {
+                    b.Navigation("CambiosRuta");
+
                     b.Navigation("Envios");
                 });
 
             modelBuilder.Entity("Backend.BDFolder.Sucursal", b =>
                 {
+                    b.Navigation("Coberturas");
+
                     b.Navigation("Empleados");
 
                     b.Navigation("Flotillas");
+
+                    b.Navigation("Horarios");
                 });
 
             modelBuilder.Entity("Backend.BDFolder.Unidad", b =>

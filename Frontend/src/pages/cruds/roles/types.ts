@@ -1,10 +1,19 @@
+export interface PermisoItem {
+  id: number;
+  codigo: string;
+  modulo: string;
+  descripcion: string;
+  asignado: boolean;
+}
+
 export interface Rol {
   id: number;
   nombre: string;
   descripcion: string | null;
+  permisos?: PermisoItem[];
 }
 
-export type FormData = Omit<Rol, "id">;
+export type FormData = Omit<Rol, "id" | "permisos">;
 export type SortDir = "asc" | "desc";
 export type SortCol = keyof Rol | null;
 

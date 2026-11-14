@@ -1,11 +1,15 @@
 import { X, Loader2 } from "lucide-react";
 import type { Cliente, FormData } from "./types";
+import {
+  bloquearTeclasNoNumericas,
+  bloquearTeclasNumericas,
+} from "../../../utils/inputValidation";
 
 interface ClienteModalFormProps {
   abierto: boolean;
   onClose: () => void;
   onSave: (e: React.FormEvent) => void;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   form: FormData;
   editando: Cliente | null;
   guardando: boolean;
@@ -53,6 +57,7 @@ export function ClienteModalForm({
                 type="text"
                 required
                 value={form.nombre}
+                onKeyDown={bloquearTeclasNumericas}
                 onChange={onChange}
                 placeholder="Nombre(s)"
               />
@@ -65,19 +70,21 @@ export function ClienteModalForm({
                 type="text"
                 required
                 value={form.apellidoPaterno}
+                onKeyDown={bloquearTeclasNumericas}
                 onChange={onChange}
                 placeholder="Apellido paterno"
               />
             </div>
             <div className="cc-field">
-              <label htmlFor="f-ap-materno">Apellido materno</label>
+              <label htmlFor="f-ap-materno">Apellido materno (opcional)</label>
               <input
                 id="f-ap-materno"
                 name="apellidoMaterno"
                 type="text"
                 value={form.apellidoMaterno}
+                onKeyDown={bloquearTeclasNumericas}
                 onChange={onChange}
-                placeholder="Apellido materno"
+                placeholder="Apellido materno (opcional)"
               />
             </div>
             <div className="cc-field">
@@ -86,12 +93,13 @@ export function ClienteModalForm({
                 id="f-telefono"
                 name="telefono"
                 type="tel"
+                inputMode="numeric"
                 required
                 pattern="[0-9]{10}"
                 title="Debe ingresar exactamente 10 dígitos numéricos"
-                maxLength={10}
                 minLength={10}
                 value={form.telefono}
+                onKeyDown={(e) => bloquearTeclasNoNumericas(e, false)}
                 onChange={onChange}
                 placeholder="Ej. 6671234567"
               />
@@ -110,25 +118,18 @@ export function ClienteModalForm({
             </div>
 
             {editando && (
-              <div className="cc-field cc-field--toggle">
-                <span className="cc-toggle-label">Estado del cliente</span>
-                <label className="cc-toggle" htmlFor="f-activo">
-                  <input
-                    id="f-activo"
-                    name="activo"
-                    type="checkbox"
-                    checked={form.activo}
-                    onChange={onChange}
-                  />
-                  <span className="cc-toggle-track">
-                    <span className="cc-toggle-thumb" />
-                  </span>
-                  <span
-                    className={`cc-toggle-text ${form.activo ? "cc-toggle-text--on" : "cc-toggle-text--off"}`}
-                  >
-                    {form.activo ? "Activo" : "Inactivo"}
-                  </span>
-                </label>
+              <div className="cc-field cc-field--wide">
+                <label htmlFor="f-motivo">Motivo de la edición *</label>
+                <textarea
+                  id="f-motivo"
+                  name="motivoEdicion"
+                  required
+                  rows={2}
+                  value={form.motivoEdicion ?? ""}
+                  onChange={onChange}
+                  placeholder="Describe la razón por la cual se actualizan los datos del cliente..."
+                  className="w-full rounded-md border border-gray-300 p-2 text-sm focus:border-tr-navy outline-none"
+                />
               </div>
             )}
           </div>
